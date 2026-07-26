@@ -26,20 +26,24 @@ export function init(moduleRef: NgModuleRef<StylingModule>) {
   function create(tplRefIdx: number) {
     component.tplRefIdx = tplRefIdx;
     component.data = items;
+    componentRef.changeDetectorRef.markForCheck();
     appRef.tick();
   }
 
   function destroy() {
     component.data = empty;
+    componentRef.changeDetectorRef.markForCheck();
     appRef.tick();
   }
 
   function update() {
     component.exp = component.exp === 'bar' ? 'baz' : 'bar';
+    componentRef.changeDetectorRef.markForCheck();
     appRef.tick();
   }
 
   function detectChanges() {
+    componentRef.changeDetectorRef.markForCheck();
     appRef.tick();
   }
 

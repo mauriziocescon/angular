@@ -22,6 +22,10 @@ const SCENARIOS = [
   {optionIndex: 8, id: 'style_property_bindings'},
   {optionIndex: 9, id: 'static_style_and_property_binding'},
   {optionIndex: 10, id: 'ng_style_with_units'},
+  {optionIndex: 11, id: 'style_map_unchanged'},
+  {optionIndex: 12, id: 'style_map_sparse_update'},
+  {optionIndex: 13, id: 'style_map_longhand_shorthand_replacement'},
+  {optionIndex: 14, id: 'class_map'},
 ];
 
 describe('styling benchmark spec', () => {

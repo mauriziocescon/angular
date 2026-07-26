@@ -687,10 +687,7 @@ export function toStylingKeyValueArray(
   if (value == null /*|| value === undefined */ || value === '') return EMPTY_ARRAY as any;
   const styleKeyValueArray: KeyValueArray<any> = [] as any;
   const unwrappedValue = unwrapSafeValue(value) as
-    | string
-    | string[]
-    | Set<string>
-    | {[key: string]: any};
+    string | string[] | Set<string> | {[key: string]: any};
   if (Array.isArray(unwrappedValue)) {
     for (let i = 0; i < unwrappedValue.length; i++) {
       keyValueArraySet(styleKeyValueArray, unwrappedValue[i], true);
@@ -782,8 +779,90 @@ function updateStylingMap(
     // On first execution the oldKeyValueArray is NO_CHANGE => treat it as empty KeyValueArray.
     oldKeyValueArray = EMPTY_ARRAY as any;
   }
+
+  // Classes have no shorthand/longhand interactions, so preserve their original single-pass order
+  // and avoid adding work to the class-map hot path.
+  if (isClassBased) {
+    let oldIndex = 0;
+    let newIndex = 0;
+    let oldKey: string | null = 0 < oldKeyValueArray.length ? oldKeyValueArray[0] : null;
+    let newKey: string | null = 0 < newKeyValueArray.length ? newKeyValueArray[0] : null;
+    while (oldKey !== null || newKey !== null) {
+      ngDevMode && assertLessThan(oldIndex, 999, 'Are we stuck in infinite loop?');
+      ngDevMode && assertLessThan(newIndex, 999, 'Are we stuck in infinite loop?');
+      const oldValue =
+        oldIndex < oldKeyValueArray.length ? oldKeyValueArray[oldIndex + 1] : undefined;
+      const newValue =
+        newIndex < newKeyValueArray.length ? newKeyValueArray[newIndex + 1] : undefined;
+      let setKey: string | null = null;
+      let setValue: any = undefined;
+      if (oldKey === newKey) {
+        // UPDATE: Keys are equal => new value is overwriting old value.
+        oldIndex += 2;
+        newIndex += 2;
+        if (oldValue !== newValue) {
+          setKey = newKey;
+          setValue = newValue;
+        }
+      } else if (newKey === null || (oldKey !== null && oldKey < newKey!)) {
+        // DELETE: oldKey key is missing or we did not find the oldKey in the newValue
+        // (because the keyValueArray is sorted and `newKey` is found later alphabetically).
+        // `"background" < "color"` so we need to delete `"background"` because it is not found in the
+        // new array.
+        oldIndex += 2;
+        setKey = oldKey;
+      } else {
+        // CREATE: newKey's is earlier alphabetically than oldKey's (or no oldKey) => we have new key.
+        // `"color" > "background"` so we need to add `color` because it is in new array but not in
+        // old array.
+        ngDevMode && assertDefined(newKey, 'Expecting to have a valid key');
+        newIndex += 2;
+        setKey = newKey;
+        setValue = newValue;
+      }
+      if (setKey !== null) {
+        updateStyling(tView, tNode, lView, renderer, setKey, setValue, isClassBased, bindingIndex);
+      }
+      oldKey = oldIndex < oldKeyValueArray.length ? oldKeyValueArray[oldIndex] : null;
+      newKey = newIndex < newKeyValueArray.length ? newKeyValueArray[newIndex] : null;
+    }
+    return;
+  }
+
+  // A single style entry cannot require a second merge pass. Reconcile it directly while still
+  // ensuring that a replaced key is removed before its replacement is set.
+  if (oldKeyValueArray.length <= 2 && newKeyValueArray.length <= 2) {
+    const oldKey: string | null = oldKeyValueArray.length === 0 ? null : oldKeyValueArray[0];
+    const newKey: string | null = newKeyValueArray.length === 0 ? null : newKeyValueArray[0];
+    const oldValue = oldKey === null ? undefined : oldKeyValueArray[1];
+    const newValue = newKey === null ? undefined : newKeyValueArray[1];
+    if (oldKey === newKey) {
+      if (oldKey !== null && oldValue !== newValue) {
+        updateStyling(tView, tNode, lView, renderer, newKey!, newValue, false, bindingIndex);
+      }
+    } else if (oldKey === null) {
+      updateStyling(tView, tNode, lView, renderer, newKey!, newValue, false, bindingIndex);
+    } else if (newKey === null) {
+      updateStyling(tView, tNode, lView, renderer, oldKey, undefined, false, bindingIndex);
+    } else if (newValue == null && newKey < oldKey) {
+      // Both calls belong to the removal/fallback phase; retain sorted-key order between them.
+      updateStyling(tView, tNode, lView, renderer, newKey, newValue, false, bindingIndex);
+      updateStyling(tView, tNode, lView, renderer, oldKey, undefined, false, bindingIndex);
+    } else {
+      updateStyling(tView, tNode, lView, renderer, oldKey, undefined, false, bindingIndex);
+      updateStyling(tView, tNode, lView, renderer, newKey, newValue, false, bindingIndex);
+    }
+    return;
+  }
+
+  // Remove declarations (and resolve undefined exact-key fallbacks) before setting declarations.
+  // Otherwise, removing a longhand after setting its shorthand can partially undo the shorthand.
   let oldIndex = 0;
   let newIndex = 0;
+  // Remember a single non-null update by index so the common sparse-update case needs no second
+  // scan. Multiple sets are replayed after every removal/fallback has completed.
+  let updateToSetIndex = -1;
+  let hasMultipleUpdatesToSet = false;
   let oldKey: string | null = 0 < oldKeyValueArray.length ? oldKeyValueArray[0] : null;
   let newKey: string | null = 0 < newKeyValueArray.length ? newKeyValueArray[0] : null;
   while (oldKey !== null || newKey !== null) {
@@ -793,37 +872,71 @@ function updateStylingMap(
       oldIndex < oldKeyValueArray.length ? oldKeyValueArray[oldIndex + 1] : undefined;
     const newValue =
       newIndex < newKeyValueArray.length ? newKeyValueArray[newIndex + 1] : undefined;
-    let setKey: string | null = null;
-    let setValue: any = undefined;
     if (oldKey === newKey) {
-      // UPDATE: Keys are equal => new value is overwriting old value.
       oldIndex += 2;
       newIndex += 2;
-      if (oldValue !== newValue) {
-        setKey = newKey;
-        setValue = newValue;
+      if (oldValue !== newValue && newValue == null) {
+        updateStyling(tView, tNode, lView, renderer, newKey!, newValue, false, bindingIndex);
+      } else if (oldValue !== newValue) {
+        if (updateToSetIndex === -1) {
+          updateToSetIndex = newIndex - 2;
+        } else {
+          hasMultipleUpdatesToSet = true;
+        }
       }
     } else if (newKey === null || (oldKey !== null && oldKey < newKey!)) {
-      // DELETE: oldKey key is missing or we did not find the oldKey in the newValue
-      // (because the keyValueArray is sorted and `newKey` is found later alphabetically).
-      // `"background" < "color"` so we need to delete `"background"` because it is not found in the
-      // new array.
       oldIndex += 2;
-      setKey = oldKey;
+      updateStyling(tView, tNode, lView, renderer, oldKey!, undefined, false, bindingIndex);
     } else {
-      // CREATE: newKey's is earlier alphabetically than oldKey's (or no oldKey) => we have new key.
-      // `"color" > "background"` so we need to add `color` because it is in new array but not in
-      // old array.
       ngDevMode && assertDefined(newKey, 'Expecting to have a valid key');
       newIndex += 2;
-      setKey = newKey;
-      setValue = newValue;
-    }
-    if (setKey !== null) {
-      updateStyling(tView, tNode, lView, renderer, setKey, setValue, isClassBased, bindingIndex);
+      if (newValue == null) {
+        updateStyling(tView, tNode, lView, renderer, newKey, newValue, false, bindingIndex);
+      } else {
+        if (updateToSetIndex === -1) {
+          updateToSetIndex = newIndex - 2;
+        } else {
+          hasMultipleUpdatesToSet = true;
+        }
+      }
     }
     oldKey = oldIndex < oldKeyValueArray.length ? oldKeyValueArray[oldIndex] : null;
     newKey = newIndex < newKeyValueArray.length ? newKeyValueArray[newIndex] : null;
+  }
+
+  if (updateToSetIndex === -1) {
+    return;
+  }
+  if (!hasMultipleUpdatesToSet) {
+    updateStyling(
+      tView,
+      tNode,
+      lView,
+      renderer,
+      newKeyValueArray[updateToSetIndex],
+      newKeyValueArray[updateToSetIndex + 1],
+      false,
+      bindingIndex,
+    );
+    return;
+  }
+
+  // Phase 1 has completed. Align each new key with the old array and apply only changed non-null
+  // values; missing and nullish entries were already handled above.
+  oldIndex = 0;
+  for (newIndex = 0; newIndex < newKeyValueArray.length; newIndex += 2) {
+    ngDevMode && assertLessThan(oldIndex, 999, 'Are we stuck in infinite loop?');
+    ngDevMode && assertLessThan(newIndex, 999, 'Are we stuck in infinite loop?');
+    const setKey: string = newKeyValueArray[newIndex];
+    const newValue = newKeyValueArray[newIndex + 1];
+    while (oldIndex < oldKeyValueArray.length && oldKeyValueArray[oldIndex] < setKey) {
+      oldIndex += 2;
+    }
+    const oldKeyAtIndex = oldIndex < oldKeyValueArray.length ? oldKeyValueArray[oldIndex] : null;
+    const oldValue = oldKeyAtIndex === setKey ? oldKeyValueArray[oldIndex + 1] : undefined;
+    if ((oldKeyAtIndex !== setKey || oldValue !== newValue) && newValue != null) {
+      updateStyling(tView, tNode, lView, renderer, setKey, newValue, false, bindingIndex);
+    }
   }
 }
 

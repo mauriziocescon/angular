@@ -94,6 +94,94 @@ describe('styling', () => {
       expect(getSortedStyle(div)).toEqual('color: blue; width: 100px;');
     });
 
+    isBrowser &&
+      it('should reconcile style-map longhands and shorthands in CSSOM order', () => {
+        @Component({
+          template: `<div [style]="styles"></div>`,
+          standalone: false,
+          changeDetection: ChangeDetectionStrategy.Eager,
+        })
+        class Cmp {
+          styles: Record<string, string | null> = {};
+        }
+
+        TestBed.configureTestingModule({declarations: [Cmp]});
+        const fixture = TestBed.createComponent(Cmp);
+        const div = fixture.nativeElement.querySelector('div') as HTMLElement;
+        const cases = [
+          {
+            shorthand: 'padding',
+            longhand: 'padding-left',
+            shorthandValue: '4em',
+            longhandValue: '1em',
+            affected: 'paddingLeft' as const,
+            unaffected: 'paddingTop' as const,
+            expectedShorthand: '4em',
+            expectedLonghand: '1em',
+          },
+          {
+            shorthand: 'border',
+            longhand: 'border-left',
+            shorthandValue: '4px solid red',
+            longhandValue: '1px solid blue',
+            affected: 'borderLeftWidth' as const,
+            unaffected: 'borderTopWidth' as const,
+            expectedShorthand: '4px',
+            expectedLonghand: '1px',
+          },
+        ];
+
+        for (const testCase of cases) {
+          fixture.componentInstance.styles = {[testCase.longhand]: testCase.longhandValue};
+          fixture.detectChanges();
+
+          fixture.componentInstance.styles = {[testCase.shorthand]: testCase.shorthandValue};
+          fixture.detectChanges();
+          expect(div.style[testCase.affected]).toBe(testCase.expectedShorthand);
+          expect(div.style[testCase.unaffected]).toBe(testCase.expectedShorthand);
+
+          fixture.componentInstance.styles = {[testCase.longhand]: testCase.longhandValue};
+          fixture.detectChanges();
+          expect(div.style[testCase.affected]).toBe(testCase.expectedLonghand);
+          expect(div.style[testCase.unaffected]).toBe('');
+
+          fixture.componentInstance.styles = {
+            [testCase.shorthand]: testCase.shorthandValue,
+            [testCase.longhand]: null,
+          };
+          fixture.detectChanges();
+          expect(div.style[testCase.affected]).toBe(testCase.expectedShorthand);
+          expect(div.style[testCase.unaffected]).toBe(testCase.expectedShorthand);
+        }
+      });
+
+    isBrowser &&
+      it('should reconcile HostBinding style-map longhands and shorthands', () => {
+        @Component({
+          template: '',
+          standalone: false,
+          changeDetection: ChangeDetectionStrategy.Eager,
+        })
+        class Cmp {
+          @HostBinding('style') styles: Record<string, string> = {'padding-left': '1em'};
+        }
+
+        TestBed.configureTestingModule({declarations: [Cmp]});
+        const fixture = TestBed.createComponent(Cmp);
+        fixture.detectChanges();
+        const host = fixture.nativeElement as HTMLElement;
+
+        fixture.componentInstance.styles = {padding: '4em'};
+        fixture.detectChanges();
+        expect(host.style.paddingLeft).toBe('4em');
+        expect(host.style.paddingTop).toBe('4em');
+
+        fixture.componentInstance.styles = {'padding-left': '1em'};
+        fixture.detectChanges();
+        expect(host.style.paddingLeft).toBe('1em');
+        expect(host.style.paddingTop).toBe('');
+      });
+
     it('should perform interpolation bindings', () => {
       @Component({
         template: `<div

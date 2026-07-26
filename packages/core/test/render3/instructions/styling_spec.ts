@@ -12,6 +12,7 @@ import {
   classStringParser,
   styleStringParser,
   toStylingKeyValueArray,
+  ɵɵclassMap,
   ɵɵclassProp,
   ɵɵstyleMap,
   ɵɵstyleProp,
@@ -29,7 +30,7 @@ import {
   TStylingKey,
   TStylingRange,
 } from '../../../src/render3/interfaces/styling';
-import {HEADER_OFFSET, TVIEW} from '../../../src/render3/interfaces/view';
+import {HEADER_OFFSET, RENDERER, TVIEW} from '../../../src/render3/interfaces/view';
 import {getLView, leaveView, setBindingRootForHostBindings} from '../../../src/render3/state';
 import {getNativeByIndex} from '../../../src/render3/util/view_utils';
 import {keyValueArraySet} from '../../../src/util/array_utils';
@@ -189,6 +190,73 @@ describe('styling', () => {
       expectStyle(div).toEqual({color: 'red', width: '200px'});
     });
 
+    it('should remove declarations before setting declarations in both directions', () => {
+      const operations = recordStyleOperations();
+      ɵɵstyleMap({'padding-left': '4em'});
+
+      clearFirstUpdatePass();
+      operations.length = 0;
+      rewindBindingIndex();
+      ɵɵstyleMap({padding: '4em'});
+      expect(operations).toEqual(['remove padding-left', 'set padding 4em']);
+
+      operations.length = 0;
+      rewindBindingIndex();
+      ɵɵstyleMap({'padding-left': '4em'});
+      expect(operations).toEqual(['remove padding', 'set padding-left 4em']);
+    });
+
+    it('should remove a retained null longhand before setting a shorthand', () => {
+      const operations = recordStyleOperations();
+      ɵɵstyleMap({'padding-left': '4em'});
+
+      clearFirstUpdatePass();
+      operations.length = 0;
+      rewindBindingIndex();
+      ɵɵstyleMap({padding: '4em', 'padding-left': null});
+      expect(operations).toEqual(['remove padding-left', 'set padding 4em']);
+    });
+
+    it('should remove a retained undefined longhand before setting a shorthand', () => {
+      const operations = recordStyleOperations();
+      ɵɵstyleMap({'padding-left': '4em'});
+
+      clearFirstUpdatePass();
+      operations.length = 0;
+      rewindBindingIndex();
+      ɵɵstyleMap({padding: '4em', 'padding-left': undefined});
+      expect(operations).toEqual(['remove padding-left', 'set padding 4em']);
+    });
+
+    it('should apply each non-conflicting map change exactly once', () => {
+      const operations = recordStyleOperations();
+      ɵɵstyleMap({color: 'red', height: '10px', width: '20px'});
+
+      clearFirstUpdatePass();
+      operations.length = 0;
+      rewindBindingIndex();
+      ɵɵstyleMap({color: 'blue', height: null, opacity: 0.5});
+      expect(operations).toEqual([
+        'remove height',
+        'remove width',
+        'set color blue',
+        'set opacity 0.5',
+      ]);
+    });
+
+    it('should resolve an undefined exact-key fallback before setting a shorthand', () => {
+      const operations = recordStyleOperations();
+      ɵɵstyleProp('padding-left', '9em');
+      ɵɵstyleMap({'padding-left': '4em'});
+
+      clearFirstUpdatePass();
+      operations.length = 0;
+      rewindBindingIndex();
+      ɵɵstyleProp('padding-left', '9em');
+      ɵɵstyleMap({padding: '2em', 'padding-left': undefined});
+      expect(operations).toEqual(['set padding-left 9em', 'set padding 2em']);
+    });
+
     describe('suffix', () => {
       it('should append suffix', () => {
         ɵɵstyleProp('width', 200, 'px');
@@ -216,6 +284,28 @@ describe('styling', () => {
         expectStyle(div).toEqual({width: '200px'});
       });
     });
+  });
+
+  it('should retain single-pass class-map reconciliation', () => {
+    const renderer = getLView()[RENDERER];
+    const addClass = renderer.addClass.bind(renderer);
+    const removeClass = renderer.removeClass.bind(renderer);
+    const operations: string[] = [];
+    spyOn(renderer, 'addClass').and.callFake((element, name) => {
+      operations.push(`add ${name}`);
+      addClass(element, name);
+    });
+    spyOn(renderer, 'removeClass').and.callFake((element, name) => {
+      operations.push(`remove ${name}`);
+      removeClass(element, name);
+    });
+    ɵɵclassMap({alpha: true, beta: false});
+
+    clearFirstUpdatePass();
+    operations.length = 0;
+    rewindBindingIndex();
+    ɵɵclassMap({alpha: false, beta: true, gamma: true});
+    expect(operations).toEqual(['remove alpha', 'add beta', 'add gamma']);
   });
 
   describe('static', () => {
@@ -477,6 +567,22 @@ function expectStyle(element: HTMLElement) {
 
 function expectClass(element: HTMLElement) {
   return expect(getElementClasses(element));
+}
+
+function recordStyleOperations(): string[] {
+  const renderer = getLView()[RENDERER];
+  const setStyle = renderer.setStyle.bind(renderer);
+  const removeStyle = renderer.removeStyle.bind(renderer);
+  const operations: string[] = [];
+  spyOn(renderer, 'setStyle').and.callFake((element, style, value, flags) => {
+    operations.push(`set ${style} ${value}`);
+    setStyle(element, style, value, flags);
+  });
+  spyOn(renderer, 'removeStyle').and.callFake((element, style, flags) => {
+    operations.push(`remove ${style}`);
+    removeStyle(element, style, flags);
+  });
+  return operations;
 }
 
 function givenTemplateAttrs(tAttrs: TAttributes) {
