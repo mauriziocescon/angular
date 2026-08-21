@@ -1931,7 +1931,11 @@ var require_request = __commonJS({
           } else if (typeof val[i] === "object") {
             throw new InvalidArgumentError(`invalid ${key} header`);
           } else {
-            arr.push(`${val[i]}`);
+            const str = `${val[i]}`;
+            if (!isValidHeaderValue(str)) {
+              throw new InvalidArgumentError(`invalid ${key} header`);
+            }
+            arr.push(str);
           }
         }
         val = arr;
@@ -1943,6 +1947,9 @@ var require_request = __commonJS({
         val = "";
       } else {
         val = `${val}`;
+        if (!isValidHeaderValue(val)) {
+          throw new InvalidArgumentError(`invalid ${key} header`);
+        }
       }
       if (headerName === "host") {
         if (request3.host !== null) {
@@ -5666,6 +5673,7 @@ var require_client_h1 = __commonJS({
       RequestContentLengthMismatchError,
       ResponseContentLengthMismatchError,
       RequestAbortedError,
+      InvalidArgumentError,
       HeadersTimeoutError,
       HeadersOverflowError,
       SocketError,
@@ -6392,8 +6400,16 @@ var require_client_h1 = __commonJS({
         }
         body = bodyStream.stream;
         contentLength = bodyStream.length;
-      } else if (util.isBlobLike(body) && request3.contentType == null && body.type) {
-        headers.push("content-type", body.type);
+      } else if (util.isBlobLike(body) && request3.contentType == null) {
+        const contentType = body.type;
+        if (contentType) {
+          const contentTypeValue = `${contentType}`;
+          if (!util.isValidHeaderValue(contentTypeValue)) {
+            util.errorRequest(client, request3, new InvalidArgumentError("invalid content-type header"));
+            return false;
+          }
+          headers.push("content-type", contentTypeValue);
+        }
       }
       if (body && typeof body.read === "function") {
         body.read(0);
@@ -8948,6 +8964,24 @@ var require_retry_handler = __commonJS({
       const current = Date.now();
       return new Date(retryAfter).getTime() - current;
     }
+    function validatePartialResponseContentLength(headers, range, statusCode, retryCount) {
+      const contentLength = headers["content-length"];
+      if (contentLength == null) {
+        return null;
+      }
+      if (!Number.isFinite(range.start) || !Number.isFinite(range.end)) {
+        return null;
+      }
+      const length = Number(contentLength);
+      const expectedLength = range.end - range.start + 1;
+      if (!Number.isFinite(length) || length !== expectedLength) {
+        return new RequestRetryError("Content-Length mismatch", statusCode, {
+          headers,
+          data: { count: retryCount }
+        });
+      }
+      return null;
+    }
     var RetryHandler = class _RetryHandler {
       constructor(opts, handlers) {
         const { retryOptions, ...dispatchOpts } = opts;
@@ -9121,6 +9155,11 @@ var require_retry_handler = __commonJS({
             );
             return false;
           }
+          const contentLengthError = validatePartialResponseContentLength(headers, contentRange, statusCode, this.retryCount);
+          if (contentLengthError != null) {
+            this.abort(contentLengthError);
+            return false;
+          }
           const { start, size, end = size - 1 } = contentRange;
           assert2(this.start === start, "content-range mismatch");
           assert2(this.end == null || this.end === end, "content-range mismatch");
@@ -9137,6 +9176,11 @@ var require_retry_handler = __commonJS({
                 resume,
                 statusMessage
               );
+            }
+            const contentLengthError = validatePartialResponseContentLength(headers, range, statusCode, this.retryCount);
+            if (contentLengthError != null) {
+              this.abort(contentLengthError);
+              return false;
             }
             const { start, size, end = size - 1 } = range;
             assert2(
@@ -15987,14 +16031,48 @@ var require_util6 = __commonJS({
       for (let i = 0; i < path3.length; ++i) {
         const code = path3.charCodeAt(i);
         if (code < 32 || // exclude CTLs (0-31)
-        code === 127 || // DEL
+        code > 126 || // exclude DEL and non-ascii
         code === 59) {
           throw new Error("Invalid cookie path");
         }
       }
     }
+    function isLetterOrDigit(code) {
+      return code >= 48 && code <= 57 || // 0-9
+      code >= 65 && code <= 90 || // A-Z
+      code >= 97 && code <= 122;
+    }
     function validateCookieDomain(domain) {
-      if (domain.startsWith("-") || domain.endsWith(".") || domain.endsWith("-")) {
+      if (domain === " ") {
+        return;
+      }
+      if (domain.length > 255) {
+        throw new Error("Invalid cookie domain");
+      }
+      let labelLength = 0;
+      for (let i = 0; i < domain.length; ++i) {
+        const code = domain.charCodeAt(i);
+        if (code === 46) {
+          if (labelLength === 0) {
+            throw new Error("Invalid cookie domain");
+          }
+          if (domain.charCodeAt(i - 1) === 45) {
+            throw new Error("Invalid cookie domain");
+          }
+          labelLength = 0;
+          continue;
+        }
+        if (labelLength === 0 && !isLetterOrDigit(code)) {
+          throw new Error("Invalid cookie domain");
+        }
+        if (!isLetterOrDigit(code) && code !== 45) {
+          throw new Error("Invalid cookie domain");
+        }
+        if (++labelLength > 63) {
+          throw new Error("Invalid cookie domain");
+        }
+      }
+      if (labelLength === 0 || domain.charCodeAt(domain.length - 1) === 45) {
         throw new Error("Invalid cookie domain");
       }
     }
@@ -16077,7 +16155,11 @@ var require_util6 = __commonJS({
           throw new Error("Invalid unparsed");
         }
         const [key, ...value] = part.split("=");
-        out.push(`${key.trim()}=${value.join("=")}`);
+        const trimmedKey = key.trim();
+        const joinedValue = value.join("=");
+        validateCookieName(trimmedKey);
+        validateCookieValue(joinedValue);
+        out.push(`${trimmedKey}=${joinedValue}`);
       }
       return out.join("; ");
     }
@@ -19572,14 +19654,17 @@ var require_dist = __commonJS({
       return result;
     }
     function parse4(header, options) {
+      const stopChar = options?.comma === true ? COMMA : 65536;
       const len = header.length;
-      let index = skipOWS(header, 0, len);
+      let index = skipOWS(header, options?.start ?? 0, len);
       const valueStart = index;
-      index = skipValue(header, index, len);
+      index = skipValue(header, index, len, stopChar);
       const valueEnd = trailingOWS(header, valueStart, index);
       const type = header.slice(valueStart, valueEnd).toLowerCase();
-      const parameters = options?.parameters === false ? new NullObject() : parseParameters(header, index, len);
-      return { type, parameters };
+      if (options?.parameters === false) {
+        return { type, index, parameters: new NullObject() };
+      }
+      return parseParameters(header, type, index, len, stopChar);
     }
     var SP = 32;
     var HTAB = 9;
@@ -19587,14 +19672,19 @@ var require_dist = __commonJS({
     var EQ = 61;
     var DQUOTE = 34;
     var BSLASH = 92;
-    function parseParameters(header, index, len) {
+    var COMMA = 44;
+    function parseParameters(header, type, index, len, stopChar) {
       const parameters = new NullObject();
       parameter:
         while (index < len) {
+          if (header.charCodeAt(index) === stopChar)
+            break;
           index = skipOWS(header, index + 1, len);
           const keyStart = index;
           while (index < len) {
             const code = header.charCodeAt(index);
+            if (code === stopChar)
+              break parameter;
             if (code === SEMI)
               continue parameter;
             if (code === EQ) {
@@ -19607,7 +19697,7 @@ var require_dist = __commonJS({
                 while (index < len) {
                   const code2 = header.charCodeAt(index++);
                   if (code2 === DQUOTE) {
-                    index = skipValue(header, index, len);
+                    index = skipValue(header, index, len, stopChar);
                     if (parameters[key] === void 0)
                       parameters[key] = value;
                     break;
@@ -19621,7 +19711,7 @@ var require_dist = __commonJS({
                 continue parameter;
               }
               const valueStart = index;
-              index = skipValue(header, index, len);
+              index = skipValue(header, index, len, stopChar);
               if (parameters[key] === void 0) {
                 const valueEnd = trailingOWS(header, valueStart, index);
                 parameters[key] = header.slice(valueStart, valueEnd);
@@ -19631,12 +19721,12 @@ var require_dist = __commonJS({
             index++;
           }
         }
-      return parameters;
+      return { type, index, parameters };
     }
-    function skipValue(str, index, len) {
+    function skipValue(str, index, len, stopChar) {
       while (index < len) {
-        const char = str.charCodeAt(index);
-        if (char === SEMI)
+        const code = str.charCodeAt(index);
+        if (code === SEMI || code === stopChar)
           break;
         index++;
       }
@@ -28877,7 +28967,7 @@ var JSONParseV2 = (text, reviver) => {
 };
 var MAX_INT = Number.MAX_SAFE_INTEGER.toString();
 var MAX_DIGITS = MAX_INT.length;
-var stringsOrLargeNumbers = /"(?:\\.|[^"])*"|-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?/g;
+var stringsOrLargeNumbers = /"(?:[^"\\]|\\.)*"|-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?/g;
 var noiseValueWithQuotes = /^"-?\d+n+"$/;
 var applyReviverIteratively = (parsed, userReviver) => {
   const rootHolder = { "": parsed };
@@ -29000,7 +29090,7 @@ var RequestError = class extends Error {
 };
 
 // 
-var VERSION2 = "10.0.11";
+var VERSION2 = "10.0.13";
 var defaults_default = {
   headers: {
     "user-agent": `octokit-request.js/${VERSION2} ${getUserAgent()}`
@@ -29130,7 +29220,10 @@ async function getResponseData(response) {
     } catch (err) {
       return text;
     }
-  } else if (mimetype.type.startsWith("text/") || mimetype.parameters.charset?.toLowerCase() === "utf-8") {
+  } else if (mimetype.type.startsWith("text/") || // `application/octet-stream` is the canonical "arbitrary binary" type
+  // (RFC 2046) and must never be decoded as text, even when the response
+  // carries a (misleading) `charset=utf-8` parameter — see #751.
+  mimetype.parameters.charset?.toLowerCase() === "utf-8" && mimetype.type !== "application/octet-stream") {
     return response.text().catch(noop);
   } else {
     return response.arrayBuffer().catch(
@@ -29199,6 +29292,9 @@ var GraphqlResponseError = class extends Error {
       Error.captureStackTrace(this, this.constructor);
     }
   }
+  request;
+  headers;
+  response;
   name = "GraphqlResponseError";
   errors;
   data;
@@ -29335,7 +29431,7 @@ var createTokenAuth = function createTokenAuth2(token) {
 };
 
 // 
-var VERSION4 = "7.0.6";
+var VERSION4 = "7.0.7";
 
 // 
 var noop2 = () => {
@@ -32251,7 +32347,10 @@ function envForceColor() {
   if (env2.FORCE_COLOR.length === 0) {
     return 1;
   }
-  const level = Math.min(Number.parseInt(env2.FORCE_COLOR, 10), 3);
+  if (!new RegExp("^\\d+$", "v").test(env2.FORCE_COLOR)) {
+    return;
+  }
+  const level = Math.min(Number(env2.FORCE_COLOR), 3);
   if (![0, 1, 2, 3].includes(level)) {
     return;
   }
@@ -32285,6 +32384,9 @@ function _supportsColor(haveStream, { streamIsTTY, sniffFlags = true } = {}) {
       return 2;
     }
   }
+  if (forceColor !== void 0 && new RegExp("^\\d+$", "v").test(env2.FORCE_COLOR)) {
+    return forceColor;
+  }
   if ("TF_BUILD" in env2 && "AGENT_NAME" in env2) {
     return 1;
   }
@@ -32303,16 +32405,16 @@ function _supportsColor(haveStream, { streamIsTTY, sniffFlags = true } = {}) {
     return 1;
   }
   if ("CI" in env2) {
-    if (["GITHUB_ACTIONS", "GITEA_ACTIONS", "CIRCLECI"].some((key) => key in env2)) {
+    if (["GITHUB_ACTIONS", "GITEA_ACTIONS", "CIRCLECI"].some((key) => Object.hasOwn(env2, key))) {
       return 3;
     }
-    if (["TRAVIS", "APPVEYOR", "GITLAB_CI", "BUILDKITE", "DRONE"].some((sign) => sign in env2) || env2.CI_NAME === "codeship") {
+    if (["TRAVIS", "APPVEYOR", "GITLAB_CI", "BUILDKITE", "DRONE"].some((sign) => Object.hasOwn(env2, sign)) || env2.CI_NAME === "codeship") {
       return 1;
     }
     return min;
   }
   if ("TEAMCITY_VERSION" in env2) {
-    return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env2.TEAMCITY_VERSION) ? 1 : 0;
+    return new RegExp("^(?:9\\.0*[1-9]\\d*\\.|\\d{2,}\\.)", "v").test(env2.TEAMCITY_VERSION) ? 1 : 0;
   }
   if (env2.COLORTERM === "truecolor") {
     return 3;
@@ -32327,7 +32429,7 @@ function _supportsColor(haveStream, { streamIsTTY, sniffFlags = true } = {}) {
     return 3;
   }
   if ("TERM_PROGRAM" in env2) {
-    const version = Number.parseInt((env2.TERM_PROGRAM_VERSION || "").split(".")[0], 10);
+    const version = Number((env2.TERM_PROGRAM_VERSION || "").split(".", 1)[0]);
     switch (env2.TERM_PROGRAM) {
       case "iTerm.app": {
         return version >= 3 ? 3 : 2;
@@ -32337,10 +32439,10 @@ function _supportsColor(haveStream, { streamIsTTY, sniffFlags = true } = {}) {
       }
     }
   }
-  if (/-256(color)?$/i.test(env2.TERM)) {
+  if (new RegExp("-256(?:color)?$", "iv").test(env2.TERM)) {
     return 2;
   }
-  if (/^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux/i.test(env2.TERM)) {
+  if (new RegExp("^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux", "iv").test(env2.TERM)) {
     return 1;
   }
   if ("COLORTERM" in env2) {
@@ -32630,7 +32732,7 @@ function cliui(opts, _mixin) {
 }
 function ansiRegex({ onlyFirst = false } = {}) {
   const ST = "(?:\\u0007|\\u001B\\u005C|\\u009C)";
-  const osc = `(?:\\u001B\\][\\s\\S]*?${ST})`;
+  const osc = `(?:\\u001B\\][^\\u0007\\u001B\\u009C]*${ST})`;
   const csi = "[\\u001B\\u009B][[\\]()#;?]*(?:\\d{1,4}(?:[;:]\\d{0,4})*)?[\\dA-PR-TZcf-nq-uy=><~]";
   const pattern = `${osc}|${csi}`;
   return new RegExp(pattern, onlyFirst ? void 0 : "g");
@@ -34112,6 +34214,130 @@ function isElectronApp() {
 function getProcessArgvBin() {
   return process.argv[getProcessArgvBinIndex()];
 }
+var segmenter2 = new Intl.Segmenter();
+var zeroWidthClusterRegex = new RegExp("^(?:\\p{Default_Ignorable_Code_Point}|\\p{Control}|\\p{Format}|\\p{Nonspacing_Mark}|\\p{Enclosing_Mark}|\\p{Surrogate})+$", "v");
+var leadingNonPrintingRegex = new RegExp("^[\\p{Default_Ignorable_Code_Point}\\p{Control}\\p{Format}\\p{Nonspacing_Mark}\\p{Enclosing_Mark}\\p{Surrogate}]+", "v");
+var spacingMarkRegex = new RegExp("\\p{Spacing_Mark}", "v");
+var rgiEmojiRegex = new RegExp("^\\p{RGI_Emoji}$", "v");
+var unqualifiedKeycapRegex = /^[\d#*]\u20E3$/;
+var extendedPictographicRegex = new RegExp("\\p{Extended_Pictographic}", "gu");
+function isDoubleWidthNonRgiEmojiSequence(segment) {
+  if (segment.length > 50) {
+    return false;
+  }
+  if (unqualifiedKeycapRegex.test(segment)) {
+    return true;
+  }
+  if (segment.includes("\u200D")) {
+    const pictographics = segment.match(extendedPictographicRegex);
+    return pictographics !== null && pictographics.length >= 2;
+  }
+  return false;
+}
+function baseVisible(segment) {
+  return segment.replace(leadingNonPrintingRegex, "");
+}
+function isZeroWidthCluster(segment) {
+  return zeroWidthClusterRegex.test(segment);
+}
+function isHangulLeadingJamo(codePoint) {
+  return codePoint >= 4352 && codePoint <= 4447 || codePoint >= 43360 && codePoint <= 43388;
+}
+function isHangulVowelJamo(codePoint) {
+  return codePoint >= 4448 && codePoint <= 4519 || codePoint >= 55216 && codePoint <= 55238;
+}
+function isHangulTrailingJamo(codePoint) {
+  return codePoint >= 4520 && codePoint <= 4607 || codePoint >= 55243 && codePoint <= 55291;
+}
+function isHangulJamo(codePoint) {
+  return isHangulLeadingJamo(codePoint) || isHangulVowelJamo(codePoint) || isHangulTrailingJamo(codePoint);
+}
+function hangulClusterWidth(visibleSegment, eastAsianWidthOptions) {
+  const codePoints = [];
+  for (const character of visibleSegment) {
+    if (zeroWidthClusterRegex.test(character)) {
+      continue;
+    }
+    codePoints.push(character.codePointAt(0));
+  }
+  if (codePoints.length === 0) {
+    return void 0;
+  }
+  let width = 0;
+  for (let index = 0; index < codePoints.length; index++) {
+    const codePoint = codePoints[index];
+    if (!isHangulJamo(codePoint)) {
+      if (width === 0) {
+        return void 0;
+      }
+      for (let remaining = index; remaining < codePoints.length; remaining++) {
+        width += eastAsianWidth(codePoints[remaining], eastAsianWidthOptions);
+      }
+      return width;
+    }
+    if (isHangulLeadingJamo(codePoint) && isHangulVowelJamo(codePoints[index + 1])) {
+      width += 2;
+      index += isHangulTrailingJamo(codePoints[index + 2]) ? 2 : 1;
+      continue;
+    }
+    width += eastAsianWidth(codePoint, eastAsianWidthOptions);
+  }
+  return width;
+}
+function trailingWidth(visibleSegment, eastAsianWidthOptions) {
+  let extra = 0;
+  let first = true;
+  for (const character of visibleSegment) {
+    if (first) {
+      first = false;
+      continue;
+    }
+    if (spacingMarkRegex.test(character) || character >= "\uFF00" && character <= "\uFFEF") {
+      extra += eastAsianWidth(character.codePointAt(0), eastAsianWidthOptions);
+    }
+  }
+  return extra;
+}
+function stringWidth2(input, options = {}) {
+  if (typeof input !== "string" || input.length === 0) {
+    return 0;
+  }
+  const {
+    ambiguousIsNarrow = true,
+    countAnsiEscapeCodes = false
+  } = options;
+  let string = input;
+  if (!countAnsiEscapeCodes && (string.includes("\x1B") || string.includes("\x9B"))) {
+    string = stripAnsi(string);
+  }
+  if (string.length === 0) {
+    return 0;
+  }
+  if (/^[\u0020-\u007E]*$/.test(string)) {
+    return string.length;
+  }
+  let width = 0;
+  const eastAsianWidthOptions = { ambiguousAsWide: !ambiguousIsNarrow };
+  for (const { segment } of segmenter2.segment(string)) {
+    if (isZeroWidthCluster(segment)) {
+      continue;
+    }
+    if (rgiEmojiRegex.test(segment) || isDoubleWidthNonRgiEmojiSequence(segment)) {
+      width += 2;
+      continue;
+    }
+    const visibleSegment = baseVisible(segment);
+    const hangulWidth = hangulClusterWidth(visibleSegment, eastAsianWidthOptions);
+    if (hangulWidth !== void 0) {
+      width += hangulWidth;
+      continue;
+    }
+    const codePoint = visibleSegment.codePointAt(0);
+    width += eastAsianWidth(codePoint, eastAsianWidthOptions);
+    width += trailingWidth(visibleSegment, eastAsianWidthOptions);
+  }
+  return width;
+}
 var node_default = {
   fs: {
     readFileSync: readFileSync22,
@@ -34334,7 +34560,7 @@ var esm_default = {
     const callerFile = (0, import_get_caller_file.default)(3);
     return callerFile.match(/^file:\/\//) ? fileURLToPath(callerFile) : callerFile;
   },
-  stringWidth,
+  stringWidth: stringWidth2,
   y18n: y18n_default({
     directory: resolve4(__dirname2, "../../../locales"),
     updateFiles: false
@@ -36111,6 +36337,8 @@ function mergeDeep2(config1, config2) {
   }
   Object.assign(target, config1);
   for (const key of Object.keys(config2)) {
+    if (key === "__proto__")
+      continue;
     if (isObject(config2[key]) && isObject(target[key])) {
       target[key] = mergeDeep2(config1[key], config2[key]);
     } else {
@@ -37159,7 +37387,7 @@ var YargsInstance = class {
   [kGetDollarZero]() {
     let $0 = "";
     let default$0;
-    if (/\b(node|iojs|electron)(\.exe)?$/.test(__classPrivateFieldGet(this, _YargsInstance_shim, "f").process.argv()[0])) {
+    if (/\b(node|iojs|electron|bun)(\.exe)?$/.test(__classPrivateFieldGet(this, _YargsInstance_shim, "f").process.argv()[0])) {
       default$0 = __classPrivateFieldGet(this, _YargsInstance_shim, "f").process.argv().slice(1, 2);
     } else {
       default$0 = __classPrivateFieldGet(this, _YargsInstance_shim, "f").process.argv().slice(0, 1);
@@ -58101,7 +58329,7 @@ var RequestError2 = class extends Error {
     this.request = requestCopy;
   }
 };
-var VERSION22 = "10.0.11";
+var VERSION22 = "10.0.13";
 var defaults_default2 = {
   headers: {
     "user-agent": `octokit-request.js/${VERSION22} ${getUserAgent2()}`
@@ -58231,7 +58459,10 @@ async function getResponseData2(response) {
     } catch (err) {
       return text;
     }
-  } else if (mimetype.type.startsWith("text/") || mimetype.parameters.charset?.toLowerCase() === "utf-8") {
+  } else if (mimetype.type.startsWith("text/") || // `application/octet-stream` is the canonical "arbitrary binary" type
+  // (RFC 2046) and must never be decoded as text, even when the response
+  // carries a (misleading) `charset=utf-8` parameter — see #751.
+  mimetype.parameters.charset?.toLowerCase() === "utf-8" && mimetype.type !== "application/octet-stream") {
     return response.text().catch(noop3);
   } else {
     return response.arrayBuffer().catch(
@@ -58298,6 +58529,9 @@ var GraphqlResponseError2 = class extends Error {
       Error.captureStackTrace(this, this.constructor);
     }
   }
+  request;
+  headers;
+  response;
   name = "GraphqlResponseError";
   errors;
   data;
@@ -58430,7 +58664,7 @@ var createTokenAuth3 = function createTokenAuth22(token) {
     hook: hook2.bind(null, token)
   });
 };
-var VERSION42 = "7.0.6";
+var VERSION42 = "7.0.7";
 var noop22 = () => {
 };
 var consoleWarn2 = console.warn.bind(console);
@@ -65102,7 +65336,10 @@ content-type/dist/index.js:
   (* v8 ignore next -- @preserve *)
   (* v8 ignore else -- @preserve *)
 
-@angular/ng-dev/bundles/chunk-GE5YLAX7.mjs:
+@octokit/graphql/dist-bundle/index.js:
+  (* v8 ignore if -- @preserve *)
+
+@angular/ng-dev/bundles/chunk-H3MYIWGQ.mjs:
   (*! Bundled license information:
   
   yargs-parser/build/lib/string-utils.js:
@@ -65143,7 +65380,7 @@ content-type/dist/index.js:
      *)
   *)
 
-@angular/ng-dev/bundles/chunk-M7XMYTYE.mjs:
+@angular/ng-dev/bundles/chunk-HZ7F2LK6.mjs:
   (*! Bundled license information:
   
   content-type/dist/index.js:
@@ -65159,5 +65396,8 @@ content-type/dist/index.js:
   @octokit/request/dist-bundle/index.js:
     (* v8 ignore next -- @preserve *)
     (* v8 ignore else -- @preserve *)
+  
+  @octokit/graphql/dist-bundle/index.js:
+    (* v8 ignore if -- @preserve *)
   *)
 */

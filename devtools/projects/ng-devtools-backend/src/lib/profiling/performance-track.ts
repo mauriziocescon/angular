@@ -13,13 +13,24 @@ import type {ComponentInstance, DirectiveInstance} from '../shared/interfaces';
 
 type Method = keyof LifecycleProfile | 'changeDetection' | string;
 
-// Timing API global flag.
-let timingAPIFlag = false;
+// Performance track global flag.
+let chromeDevToolsPerformanceTrackEnabled = false;
 
-export const enableTimingAPI = () => (timingAPIFlag = true);
-export const disableTimingAPI = () => (timingAPIFlag = false);
+/** Enable Angular's performance track in the Chrome DevTools profiler. */
+export function enablePerformanceTrack(): void {
+  if (!chromeDevToolsPerformanceTrackEnabled) {
+    getProfiler().subscribe(timingHooks);
+    chromeDevToolsPerformanceTrackEnabled = true;
+  }
+}
 
-const timingAPIEnabled = () => timingAPIFlag;
+/** Disable Angular's performance track in the Chrome DevTools profiler. */
+export function disablePerformanceTrack() {
+  getProfiler().unsubscribe(timingHooks);
+  chromeDevToolsPerformanceTrackEnabled = false;
+}
+
+const performanceTrackEnabled = () => chromeDevToolsPerformanceTrackEnabled;
 
 const markName = (s: string, method: Method) => `🅰️ ${s}#${method}`;
 
@@ -61,41 +72,41 @@ const endMark = (nodeName: string, method: Method) => {
   }
 };
 
-getProfiler().subscribe({
+const timingHooks = {
   onChangeDetectionStart(component: ComponentInstance): void {
-    if (!timingAPIEnabled()) {
+    if (!performanceTrackEnabled()) {
       return;
     }
     recordMark(getDirectiveName(component), 'changeDetection');
   },
   onChangeDetectionEnd(component: ComponentInstance): void {
-    if (!timingAPIEnabled()) {
+    if (!performanceTrackEnabled()) {
       return;
     }
     endMark(getDirectiveName(component), 'changeDetection');
   },
   onLifecycleHookStart(component: DirectiveInstance, lifecyle: keyof LifecycleProfile): void {
-    if (!timingAPIEnabled()) {
+    if (!performanceTrackEnabled()) {
       return;
     }
     recordMark(getDirectiveName(component), lifecyle);
   },
   onLifecycleHookEnd(component: DirectiveInstance, lifecyle: keyof LifecycleProfile): void {
-    if (!timingAPIEnabled()) {
+    if (!performanceTrackEnabled()) {
       return;
     }
     endMark(getDirectiveName(component), lifecyle);
   },
   onOutputStart(component: DirectiveInstance, output: string): void {
-    if (!timingAPIEnabled()) {
+    if (!performanceTrackEnabled()) {
       return;
     }
     recordMark(getDirectiveName(component), output);
   },
   onOutputEnd(component: DirectiveInstance, output: string): void {
-    if (!timingAPIEnabled()) {
+    if (!performanceTrackEnabled()) {
       return;
     }
     endMark(getDirectiveName(component), output);
   },
-});
+};

@@ -5,10 +5,11 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.dev/license
  */
-import {CommonModule} from '@angular/common';
+import {NgClass, NgFor, NgIf, NgStyle} from '@angular/common';
 import {By, DomSanitizer, SafeStyle} from '@angular/platform-browser';
 import {isBrowser} from '@angular/private/testing';
 import {
+  ChangeDetectionStrategy,
   Component,
   ComponentRef,
   Directive,
@@ -19,7 +20,6 @@ import {
   Renderer2,
   ViewChild,
   ViewContainerRef,
-  ChangeDetectionStrategy,
 } from '../../src/core';
 import {bypassSanitizationTrustStyle} from '../../src/sanitization/bypass';
 import {TestBed} from '../../testing';
@@ -40,13 +40,9 @@ describe('styling', () => {
     it('should perform static bindings', () => {
       @Component({
         template: `<div class="STATIC" style="color: blue"></div>`,
-        standalone: false,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Cmp {}
 
-      TestBed.configureTestingModule({declarations: [Cmp]});
       const fixture = TestBed.createComponent(Cmp);
       const staticDiv = fixture.nativeElement.querySelectorAll('div')[0];
 
@@ -61,13 +57,9 @@ describe('styling', () => {
           [style.color]="'blue'"
           [style.width.px]="100"
         ></div>`,
-        standalone: false,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Cmp {}
 
-      TestBed.configureTestingModule({declarations: [Cmp]});
       const fixture = TestBed.createComponent(Cmp);
       fixture.detectChanges();
 
@@ -79,13 +71,9 @@ describe('styling', () => {
     it('should perform map bindings', () => {
       @Component({
         template: `<div [class]="{dynamic: true}" [style]="{color: 'blue', width: '100px'}"></div>`,
-        standalone: false,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Cmp {}
 
-      TestBed.configureTestingModule({declarations: [Cmp]});
       const fixture = TestBed.createComponent(Cmp);
       fixture.detectChanges();
 
@@ -189,13 +177,9 @@ describe('styling', () => {
           style.color="blu{{ 'e' }}"
           style="width: {{ '100' }}px"
         ></div>`,
-        standalone: false,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Cmp {}
 
-      TestBed.configureTestingModule({declarations: [Cmp]});
       const fixture = TestBed.createComponent(Cmp);
       fixture.detectChanges();
 
@@ -205,6 +189,18 @@ describe('styling', () => {
     });
 
     it('should support hostBindings', () => {
+      @Directive({
+        selector: '[my-host-bindings-1]',
+        host: {'class': 'HOST_STATIC_1', 'style': 'font-family: "c1"'},
+      })
+      class Dir1 {}
+
+      @Directive({
+        selector: '[my-host-bindings-2]',
+        host: {'class': 'HOST_STATIC_2', 'style': 'font-family: "c2"'},
+      })
+      class Dir2 {}
+
       @Component({
         template: `<div
           my-host-bindings-2
@@ -212,36 +208,17 @@ describe('styling', () => {
           class="STATIC"
           style="color: blue"
         ></div>`,
-        standalone: false,
 
-        changeDetection: ChangeDetectionStrategy.Eager,
-      })
-      class Cmp {}
-      @Directive({
-        selector: '[my-host-bindings-1]',
-        host: {'class': 'HOST_STATIC_1', 'style': 'font-family: "c1"'},
-        standalone: false,
-      })
-      class Dir1 {}
-
-      @Directive({
-        selector: '[my-host-bindings-2]',
-        host: {'class': 'HOST_STATIC_2', 'style': 'font-family: "c2"'},
-        standalone: false,
-      })
-      class Dir2 {}
-
-      TestBed.configureTestingModule({
-        declarations: [
+        imports: [
           // Order of directives in the template does not matter.
           // Order of declarations matters as it determines the relative priority for overrides.
           Dir1,
           Dir2,
           // Even thought component is at the end, it will still have lowest priority because
           // components are special that way.
-          Cmp,
         ],
-      });
+      })
+      class Cmp {}
       const fixture = TestBed.createComponent(Cmp);
       fixture.detectChanges();
 
@@ -252,26 +229,22 @@ describe('styling', () => {
     });
 
     it('should support hostBindings inheritance', () => {
-      @Component({
-        template: `<div my-host-bindings class="STATIC" style="color: blue;"></div>`,
-        standalone: false,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
-      })
-      class Cmp {}
       @Directive({
         host: {'class': 'SUPER_STATIC', 'style': 'font-family: "super";'},
-        standalone: false,
       })
       class SuperDir {}
       @Directive({
         selector: '[my-host-bindings]',
         host: {'class': 'HOST_STATIC', 'style': 'font-family: "host font"'},
-        standalone: false,
       })
       class Dir extends SuperDir {}
 
-      TestBed.configureTestingModule({declarations: [Cmp, Dir]});
+      @Component({
+        template: `<div my-host-bindings class="STATIC" style="color: blue;"></div>`,
+        imports: [Dir],
+      })
+      class Cmp {}
+
       const fixture = TestBed.createComponent(Cmp);
       fixture.detectChanges();
 
@@ -292,13 +265,9 @@ describe('styling', () => {
           <div style='content: "foo"'></div>
           <div style="content: 'foo'"></div>
         `,
-        standalone: false,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Cmp {}
 
-      TestBed.configureTestingModule({declarations: [Cmp]});
       const fixture = TestBed.createComponent(Cmp);
       fixture.detectChanges();
 
@@ -318,13 +287,9 @@ describe('styling', () => {
             [class.DELETE_PROP_B]="false"
           ></div>
         `,
-        standalone: false,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Cmp {}
 
-      TestBed.configureTestingModule({declarations: [Cmp]});
       const fixture = TestBed.createComponent(Cmp);
       fixture.detectChanges();
 
@@ -342,13 +307,9 @@ describe('styling', () => {
             [style.height.px]="undefined"
           ></div>
         `,
-        standalone: false,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Cmp {}
 
-      TestBed.configureTestingModule({declarations: [Cmp]});
       const fixture = TestBed.createComponent(Cmp);
       fixture.detectChanges();
 
@@ -361,12 +322,9 @@ describe('styling', () => {
     it('should work with ngClass/ngStyle', () => {
       @Component({
         template: `<div [ngClass]="['dynamic']" [ngStyle]="{'font-family': 'dynamic'}"></div>`,
-        standalone: false,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
+        imports: [NgClass, NgStyle],
       })
       class Cmp {}
-      TestBed.configureTestingModule({declarations: [Cmp]});
       const fixture = TestBed.createComponent(Cmp);
       fixture.detectChanges();
 
@@ -395,12 +353,9 @@ describe('styling', () => {
             <span style="width: var(--my-var)">CONTENT</span>
           </div>
         `,
-        standalone: false,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Cmp {}
-      TestBed.configureTestingModule({declarations: [Cmp]});
+
       const fixture = TestBed.createComponent(Cmp);
       fixture.detectChanges();
 
@@ -416,14 +371,10 @@ describe('styling', () => {
 
       @Component({
         template: `<h1 style="width: var(--my-1337-var)">Hello</h1>`,
-        standalone: false,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Cmp {
         @HostBinding('style') style = '--my-1337-var: 100px;';
       }
-      TestBed.configureTestingModule({declarations: [Cmp]});
       const fixture = TestBed.createComponent(Cmp);
       fixture.detectChanges();
 
@@ -443,12 +394,9 @@ describe('styling', () => {
             <span style="width: var(--MyVar)">CONTENT</span>
           </div>
         `,
-        standalone: false,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Cmp {}
-      TestBed.configureTestingModule({declarations: [Cmp]});
+
       const fixture = TestBed.createComponent(Cmp);
       fixture.detectChanges();
 
@@ -461,8 +409,6 @@ describe('styling', () => {
     it('should allow null in a class array binding', () => {
       @Component({
         template: `<div [class]="['a', null, 'c']" [class.extra]="true"></div>`,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Cmp {}
 
@@ -475,8 +421,6 @@ describe('styling', () => {
     it('should allow undefined in a class array binding', () => {
       @Component({
         template: `<div [class]="['a', undefined, 'c']" [class.extra]="true"></div>`,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Cmp {}
 
@@ -489,8 +433,6 @@ describe('styling', () => {
     it('should allow zero in a class array binding', () => {
       @Component({
         template: `<div [class]="['a', 0, 'c']" [class.extra]="true"></div>`,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Cmp {}
 
@@ -503,8 +445,6 @@ describe('styling', () => {
     it('should allow false in a class array binding', () => {
       @Component({
         template: `<div [class]="['a', false, 'c']" [class.extra]="true"></div>`,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Cmp {}
 
@@ -517,8 +457,6 @@ describe('styling', () => {
     it('should ignore an empty string in a class array binding', () => {
       @Component({
         template: `<div [class]="['a', '', 'c']" [class.extra]="true"></div>`,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Cmp {}
 
@@ -531,8 +469,6 @@ describe('styling', () => {
     it('should ignore a string containing spaces in a class array binding', () => {
       @Component({
         template: `<div [class]="['a', 'hello there', 'c']" [class.extra]="true"></div>`,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Cmp {}
 
@@ -548,8 +484,6 @@ describe('styling', () => {
           [class]="{a: true, 'hello there': true, c: true}"
           [class.extra]="true"
         ></div>`,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Cmp {}
 
@@ -562,8 +496,6 @@ describe('styling', () => {
     it('should ignore an object literal in a class array binding', () => {
       @Component({
         template: `<div [class]="['a', {foo: true}, 'c']" [class.extra]="true"></div>`,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Cmp {}
 
@@ -576,8 +508,6 @@ describe('styling', () => {
     it('should handle a string array in a class array binding', () => {
       @Component({
         template: `<div [class]="['a', ['foo', 'bar'], 'c']" [class.extra]="true"></div>`,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class Cmp {}
 
@@ -589,20 +519,8 @@ describe('styling', () => {
   });
 
   it('should bind [class] as input to directive', () => {
-    @Component({
-      template: `
-        <div class="s1" [class]="'d1'" dir-shadows-class-input></div>
-        <div class="s2 {{ 'd2' }}" dir-shadows-class-input></div>
-      `,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
-    })
-    class Cmp {}
-
     @Directive({
       selector: '[dir-shadows-class-input]',
-      standalone: false,
     })
     class DirectiveShadowsClassInput {
       constructor(private elementRef: ElementRef) {}
@@ -612,7 +530,15 @@ describe('styling', () => {
       }
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp, DirectiveShadowsClassInput]});
+    @Component({
+      template: `
+        <div class="s1" [class]="'d1'" dir-shadows-class-input></div>
+        <div class="s2 {{ 'd2' }}" dir-shadows-class-input></div>
+      `,
+      imports: [DirectiveShadowsClassInput],
+    })
+    class Cmp {}
+
     const fixture = TestBed.createComponent(Cmp);
     fixture.detectChanges();
 
@@ -631,21 +557,9 @@ describe('styling', () => {
   });
 
   it('should not feed host classes back into shadow input', () => {
-    @Component({
-      template: `
-        <div class="s1" dir-shadows-class-input></div>
-        <div class="s1" [class]="'d1'" dir-shadows-class-input></div>
-      `,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
-    })
-    class Cmp {}
-
     @Directive({
       selector: '[dir-shadows-class-input]',
       host: {'class': 'DIRECTIVE'},
-      standalone: false,
     })
     class DirectiveShadowsClassInput {
       constructor(private elementRef: ElementRef) {}
@@ -655,7 +569,16 @@ describe('styling', () => {
       }
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp, DirectiveShadowsClassInput]});
+    @Component({
+      template: `
+        <div class="s1" dir-shadows-class-input></div>
+        <div class="s1" [class]="'d1'" dir-shadows-class-input></div>
+      `,
+
+      imports: [DirectiveShadowsClassInput],
+    })
+    class Cmp {}
+
     const fixture = TestBed.createComponent(Cmp);
     fixture.detectChanges();
 
@@ -673,21 +596,9 @@ describe('styling', () => {
   });
 
   it('should not feed host style back into shadow input', () => {
-    @Component({
-      template: `
-        <div style="width: 1px;" dir-shadows-class-input></div>
-        <div style="width: 1px;" [style]="'height:1px;'" dir-shadows-class-input></div>
-      `,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
-    })
-    class Cmp {}
-
     @Directive({
       selector: '[dir-shadows-class-input]',
       host: {'style': 'color: red;'},
-      standalone: false,
     })
     class DirectiveShadowsStyleInput {
       constructor(private elementRef: ElementRef) {}
@@ -697,7 +608,16 @@ describe('styling', () => {
       }
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp, DirectiveShadowsStyleInput]});
+    @Component({
+      template: `
+        <div style="width: 1px;" dir-shadows-class-input></div>
+        <div style="width: 1px;" [style]="'height:1px;'" dir-shadows-class-input></div>
+      `,
+
+      imports: [DirectiveShadowsStyleInput],
+    })
+    class Cmp {}
+
     const fixture = TestBed.createComponent(Cmp);
     fixture.detectChanges();
 
@@ -715,19 +635,8 @@ describe('styling', () => {
   });
 
   it('should bind [class] as input to directive when both static and falsy dynamic values are present', () => {
-    @Component({
-      template: ` <div class="s1" [class]="classBinding" dir-shadows-class-input></div> `,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
-    })
-    class Cmp {
-      classBinding: any = undefined;
-    }
-
     @Directive({
       selector: '[dir-shadows-class-input]',
-      standalone: false,
     })
     class DirectiveShadowsClassInput {
       constructor(private elementRef: ElementRef) {}
@@ -737,7 +646,16 @@ describe('styling', () => {
       }
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp, DirectiveShadowsClassInput]});
+    @Component({
+      template: ` <div class="s1" [class]="classBinding" dir-shadows-class-input></div> `,
+
+      changeDetection: ChangeDetectionStrategy.Eager,
+      imports: [DirectiveShadowsClassInput],
+    })
+    class Cmp {
+      classBinding: any = undefined;
+    }
+
     const fixture = TestBed.createComponent(Cmp);
     fixture.detectChanges();
 
@@ -762,19 +680,8 @@ describe('styling', () => {
   });
 
   it('should bind [style] as input to directive', () => {
-    @Component({
-      template: `
-        <div style="color: red;" [style]="'width: 100px;'" dir-shadows-style-input></div>
-      `,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
-    })
-    class Cmp {}
-
     @Directive({
       selector: '[dir-shadows-style-input]',
-      standalone: false,
     })
     class DirectiveShadowsStyleInput {
       constructor(private elementRef: ElementRef) {}
@@ -784,7 +691,15 @@ describe('styling', () => {
       }
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp, DirectiveShadowsStyleInput]});
+    @Component({
+      template: `
+        <div style="color: red;" [style]="'width: 100px;'" dir-shadows-style-input></div>
+      `,
+
+      imports: [DirectiveShadowsStyleInput],
+    })
+    class Cmp {}
+
     const fixture = TestBed.createComponent(Cmp);
     fixture.detectChanges();
 
@@ -794,17 +709,8 @@ describe('styling', () => {
   });
 
   it('should prevent circular ExpressionChangedAfterItHasBeenCheckedError on shadow inputs', () => {
-    @Component({
-      template: `<div class="s1" dir-shadows-class-input></div>`,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
-    })
-    class Cmp {}
-
     @Directive({
       selector: '[dir-shadows-class-input]',
-      standalone: false,
     })
     class DirectiveShadowsClassInput {
       @Input('class') klass: string | undefined;
@@ -815,7 +721,13 @@ describe('styling', () => {
       }
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp, DirectiveShadowsClassInput]});
+    @Component({
+      template: `<div class="s1" dir-shadows-class-input></div>`,
+
+      imports: [DirectiveShadowsClassInput],
+    })
+    class Cmp {}
+
     const fixture = TestBed.createComponent(Cmp);
     expect(() => fixture.detectChanges()).not.toThrow();
 
@@ -824,15 +736,29 @@ describe('styling', () => {
   });
 
   it('should recover from exceptions', () => {
+    let myDirHostBinding = false;
+    @Directive({
+      selector: '[my-dir]',
+    })
+    class MyDirective {
+      @HostBinding('class.myDir')
+      get myDir(): boolean {
+        if (myDirHostBinding === false) {
+          throw new Error('class.myDir');
+        }
+        return myDirHostBinding;
+      }
+    }
+
     @Component({
       template: `
         <div [id]="maybeThrow(id)">
           <span my-dir [class]="maybeThrow(klass)" [class.foo]="maybeThrow(foo)"></span>
         </div>
       `,
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
+      imports: [MyDirective],
     })
     class Cmp {
       id = 'throw_id';
@@ -847,22 +773,6 @@ describe('styling', () => {
       }
     }
 
-    let myDirHostBinding = false;
-    @Directive({
-      selector: '[my-dir]',
-      standalone: false,
-    })
-    class MyDirective {
-      @HostBinding('class.myDir')
-      get myDir(): boolean {
-        if (myDirHostBinding === false) {
-          throw new Error('class.myDir');
-        }
-        return myDirHostBinding;
-      }
-    }
-
-    TestBed.configureTestingModule({declarations: [Cmp, MyDirective]});
     const fixture = TestBed.createComponent(Cmp);
     const cmp = fixture.componentInstance;
     const div = fixture.nativeElement.querySelector('div');
@@ -894,17 +804,8 @@ describe('styling', () => {
   });
 
   it('should render inline style and class attribute values on the element before a directive is instantiated', () => {
-    @Component({
-      template: ` <div directive-expecting-styling style="width:200px" class="abc xyz"></div> `,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
-    })
-    class Cmp {}
-
     @Directive({
       selector: '[directive-expecting-styling]',
-      standalone: false,
     })
     class DirectiveExpectingStyling {
       constructor(elm: ElementRef) {
@@ -914,7 +815,13 @@ describe('styling', () => {
       }
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp, DirectiveExpectingStyling]});
+    @Component({
+      template: ` <div directive-expecting-styling style="width:200px" class="abc xyz"></div> `,
+
+      imports: [DirectiveExpectingStyling],
+    })
+    class Cmp {}
+
     const fixture = TestBed.createComponent(Cmp);
     fixture.detectChanges();
 
@@ -926,17 +833,8 @@ describe('styling', () => {
   });
 
   it('should only render the same initial styling values once before a directive runs', () => {
-    @Component({
-      template: ` <div directive-expecting-styling style="width:200px" class="abc"></div> `,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
-    })
-    class Cmp {}
-
     @Directive({
       selector: '[directive-expecting-styling]',
-      standalone: false,
     })
     class DirectiveExpectingStyling {
       constructor(elm: ElementRef) {
@@ -946,7 +844,13 @@ describe('styling', () => {
       }
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp, DirectiveExpectingStyling]});
+    @Component({
+      template: ` <div directive-expecting-styling style="width:200px" class="abc"></div> `,
+
+      imports: [DirectiveExpectingStyling],
+    })
+    class Cmp {}
+
     const fixture = TestBed.createComponent(Cmp);
     fixture.detectChanges();
 
@@ -957,19 +861,6 @@ describe('styling', () => {
 
   it('should ensure that static classes are assigned to ng-container elements and picked up for content projection', () => {
     @Component({
-      template: `
-        <project>
-          outer
-          <ng-container class="inner"> inner </ng-container>
-        </project>
-      `,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
-    })
-    class MyApp {}
-
-    @Component({
       selector: 'project',
       template: `
         <div class="outer-area">
@@ -979,13 +870,20 @@ describe('styling', () => {
           <ng-content select=".inner"></ng-content>
         </div>
       `,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class ProjectCmp {}
 
-    TestBed.configureTestingModule({declarations: [MyApp, ProjectCmp]});
+    @Component({
+      template: `
+        <project>
+          outer
+          <ng-container class="inner"> inner </ng-container>
+        </project>
+      `,
+      imports: [ProjectCmp],
+    })
+    class MyApp {}
+
     const fixture = TestBed.createComponent(MyApp);
     const element = fixture.nativeElement;
     fixture.detectChanges();
@@ -1000,9 +898,6 @@ describe('styling', () => {
     @Component({
       selector: '[comp]',
       template: '',
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class Comp {}
 
@@ -1012,17 +907,12 @@ describe('styling', () => {
           <p comp class="a">A</p>
         </ng-template>
       `,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
+      imports: [NgFor, Comp],
     })
     class App {
       items = [1, 2, 3];
     }
 
-    TestBed.configureTestingModule({
-      declarations: [App, Comp],
-    });
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
 
@@ -1032,13 +922,9 @@ describe('styling', () => {
   it('should do nothing for empty style bindings', () => {
     @Component({
       template: '<div [style.color]></div>',
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class App {}
 
-    TestBed.configureTestingModule({declarations: [App]});
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
 
@@ -1048,13 +934,9 @@ describe('styling', () => {
   it('should do nothing for empty class bindings', () => {
     @Component({
       template: '<div [class.is-open]></div>',
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class App {}
 
-    TestBed.configureTestingModule({declarations: [App]});
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
 
@@ -1064,16 +946,12 @@ describe('styling', () => {
   it('should be able to bind zero', () => {
     @Component({
       template: '<div #div [style.opacity]="opacity"></div>',
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class App {
       @ViewChild('div') div!: ElementRef<HTMLElement>;
       opacity = 0;
     }
 
-    TestBed.configureTestingModule({declarations: [App]});
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
 
@@ -1083,7 +961,6 @@ describe('styling', () => {
   it('should be able to bind a SafeValue to backgroundImage', () => {
     @Component({
       template: '<div [style.backgroundImage]="image"></div>',
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
     })
@@ -1091,7 +968,6 @@ describe('styling', () => {
       image!: SafeStyle;
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp]});
     const fixture = TestBed.createComponent(Cmp);
     const sanitizer: DomSanitizer = TestBed.inject(DomSanitizer);
 
@@ -1105,15 +981,12 @@ describe('styling', () => {
   it('should set !important on a single property', () => {
     @Component({
       template: '<div [style.width]="width"></div>',
-      standalone: false,
-
       changeDetection: ChangeDetectionStrategy.Eager,
     })
     class Cmp {
       width!: string;
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp]});
     const fixture = TestBed.createComponent(Cmp);
     fixture.componentInstance.width = '50px !important';
     fixture.detectChanges();
@@ -1127,7 +1000,6 @@ describe('styling', () => {
   it('should set !important that is not preceded by a space', () => {
     @Component({
       template: '<div [style.width]="width"></div>',
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
     })
@@ -1135,7 +1007,6 @@ describe('styling', () => {
       width!: string;
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp]});
     const fixture = TestBed.createComponent(Cmp);
     fixture.componentInstance.width = '50px!important';
     fixture.detectChanges();
@@ -1149,7 +1020,6 @@ describe('styling', () => {
   it('should set !important on a dash-case property', () => {
     @Component({
       template: '<div [style.margin-right]="marginRight"></div>',
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
     })
@@ -1157,7 +1027,6 @@ describe('styling', () => {
       marginRight!: string;
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp]});
     const fixture = TestBed.createComponent(Cmp);
     fixture.componentInstance.marginRight = '5px !important';
     fixture.detectChanges();
@@ -1171,7 +1040,6 @@ describe('styling', () => {
   it('should set !important on multiple properties', () => {
     @Component({
       template: '<div [style]="styles"></div>',
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
     })
@@ -1179,7 +1047,6 @@ describe('styling', () => {
       styles!: string;
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp]});
     const fixture = TestBed.createComponent(Cmp);
     fixture.componentInstance.styles = 'height: 25px !important; width: 50px !important;';
     fixture.detectChanges();
@@ -1193,7 +1060,6 @@ describe('styling', () => {
   it('should set !important if some properties are !important and other are not', () => {
     @Component({
       template: '<div [style]="styles"></div>',
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
     })
@@ -1201,7 +1067,6 @@ describe('styling', () => {
       styles!: string;
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp]});
     const fixture = TestBed.createComponent(Cmp);
     fixture.componentInstance.styles = 'height: 25px; width: 50px !important;';
     fixture.detectChanges();
@@ -1219,7 +1084,6 @@ describe('styling', () => {
     @Directive({
       selector: 'ng-template[styleDir]',
       host: {'[style.display]': 'display'},
-      standalone: false,
     })
     class StyleDir {
       display = 'block';
@@ -1228,20 +1092,15 @@ describe('styling', () => {
     @Component({
       selector: 'app-comp',
       template: `<ng-template styleDir></ng-template>`,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class MyApp {}
 
-    TestBed.configureTestingModule({declarations: [MyApp, StyleDir]});
     TestBed.createComponent(MyApp).detectChanges();
   });
 
   it('should be able to bind a SafeValue to clip-path', () => {
     @Component({
       template: '<div [style.clip-path]="path"></div>',
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
     })
@@ -1249,7 +1108,6 @@ describe('styling', () => {
       path!: SafeStyle;
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp]});
     const fixture = TestBed.createComponent(Cmp);
     const sanitizer: DomSanitizer = TestBed.inject(DomSanitizer);
 
@@ -1287,7 +1145,6 @@ describe('styling', () => {
         <div class="a{{ one }}b"></div>
         <div class="{{ one }}"></div>
       `,
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
     })
@@ -1303,7 +1160,6 @@ describe('styling', () => {
       nine = '9';
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp]});
     const fixture = TestBed.createComponent(Cmp);
     const instance = fixture.componentInstance;
     fixture.detectChanges();
@@ -1377,7 +1233,6 @@ describe('styling', () => {
         <div style="content: &quot;a{{ one }}b&quot;"></div>
         <div style="{{ self }}"></div>
       `,
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
     })
@@ -1394,7 +1249,6 @@ describe('styling', () => {
       nine = '9';
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp]});
     const fixture = TestBed.createComponent(Cmp);
     const instance = fixture.componentInstance;
     fixture.detectChanges();
@@ -1440,7 +1294,6 @@ describe('styling', () => {
   it('should support interpolations inside a class binding when other classes are present', () => {
     @Component({
       template: '<div class="zero i-{{one}} {{two}} three"></div>',
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
     })
@@ -1449,7 +1302,6 @@ describe('styling', () => {
       two = 'two';
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp]});
     const fixture = TestBed.createComponent(Cmp);
     fixture.detectChanges();
     const classList = fixture.nativeElement.querySelector('div').classList;
@@ -1493,7 +1345,6 @@ describe('styling', () => {
         <div style.font-family="f{{ one }}"></div>
         <div style.width="{{ singleBinding }}"></div>
       `,
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
     })
@@ -1510,7 +1361,6 @@ describe('styling', () => {
       nine = 9;
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp]});
     const fixture = TestBed.createComponent(Cmp);
     const instance = fixture.componentInstance;
     fixture.detectChanges();
@@ -1556,7 +1406,6 @@ describe('styling', () => {
   it('should support interpolations when a style property has a unit suffix', () => {
     @Component({
       template: '<div style.width.px="{{one}}{{three}}{{three}}7"></div>',
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
     })
@@ -1565,7 +1414,6 @@ describe('styling', () => {
       three = 3;
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp]});
     const fixture = TestBed.createComponent(Cmp);
     fixture.detectChanges();
     const div = fixture.nativeElement.querySelector('div');
@@ -1585,20 +1433,8 @@ describe('styling', () => {
     let capturedMyClassBindingCount = 0;
     let capturedMyClassBindingValue: string | null | undefined = undefined;
 
-    @Component({
-      template: '<div [class]="c" [my-class-dir]="x"></div>',
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
-    })
-    class Cmp {
-      c: any = null;
-      x = 'foo';
-    }
-
     @Directive({
       selector: '[my-class-dir]',
-      standalone: false,
     })
     class MyClassDir {
       @Input('class')
@@ -1614,7 +1450,17 @@ describe('styling', () => {
       }
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp, MyClassDir]});
+    @Component({
+      template: '<div [class]="c" [my-class-dir]="x"></div>',
+
+      changeDetection: ChangeDetectionStrategy.Eager,
+      imports: [MyClassDir],
+    })
+    class Cmp {
+      c: any = null;
+      x = 'foo';
+    }
+
     const fixture = TestBed.createComponent(Cmp);
     fixture.detectChanges();
 
@@ -1652,19 +1498,8 @@ describe('styling', () => {
     let capturedClassBindingCount = 0;
     let capturedClassBindingValue: string | null | undefined = undefined;
 
-    @Component({
-      template: '<div [class]="c" my-class-dir></div>',
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
-    })
-    class Cmp {
-      c: any = 'bar';
-    }
-
     @Directive({
       selector: '[my-class-dir]',
-      standalone: false,
     })
     class MyClassDir {
       @Input('class')
@@ -1674,7 +1509,16 @@ describe('styling', () => {
       }
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp, MyClassDir]});
+    @Component({
+      template: '<div [class]="c" my-class-dir></div>',
+
+      changeDetection: ChangeDetectionStrategy.Eager,
+      imports: [MyClassDir],
+    })
+    class Cmp {
+      c: any = 'bar';
+    }
+
     const fixture = TestBed.createComponent(Cmp);
     expect(capturedClassBindingCount).toEqual(0);
     fixture.detectChanges();
@@ -1695,19 +1539,8 @@ describe('styling', () => {
     let capturedMyClassBindingCount = 0;
     let capturedMyClassBindingValue: string | null = null;
 
-    @Component({
-      template: '<div class="static-val" [my-class-dir]="x"></div>',
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
-    })
-    class Cmp {
-      x = 'foo';
-    }
-
     @Directive({
       selector: '[my-class-dir]',
-      standalone: false,
     })
     class MyClassDir {
       @Input('class')
@@ -1723,7 +1556,15 @@ describe('styling', () => {
       }
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp, MyClassDir]});
+    @Component({
+      template: '<div class="static-val" [my-class-dir]="x"></div>',
+
+      imports: [MyClassDir],
+    })
+    class Cmp {
+      x = 'foo';
+    }
+
     const fixture = TestBed.createComponent(Cmp);
     fixture.detectChanges();
 
@@ -1737,22 +1578,16 @@ describe('styling', () => {
     @Component({
       selector: 'comp',
       template: `{{ className }}`,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class Comp {
       @Input() className: string = '';
     }
     @Component({
       template: `<comp [className]="'my-className'"></comp>`,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
+      imports: [Comp],
     })
     class App {}
 
-    TestBed.configureTestingModule({declarations: [Comp, App]});
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     expect(fixture.debugElement.nativeElement.firstChild.innerHTML).toBe('my-className');
@@ -1762,9 +1597,6 @@ describe('styling', () => {
     @Component({
       selector: 'comp',
       template: `{{ className }}`,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class Comp {
       @Input('class') className: string = '';
@@ -1772,13 +1604,10 @@ describe('styling', () => {
 
     @Component({
       template: `<comp class="static" [class]="'my-className'"></comp>`,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
+      imports: [Comp],
     })
     class App {}
 
-    TestBed.configureTestingModule({declarations: [Comp, App]});
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     expect(fixture.debugElement.nativeElement.firstChild.innerHTML).toBe('static my-className');
@@ -1790,20 +1619,8 @@ describe('styling', () => {
     let capturedMyClassBindingCount = 0;
     let capturedMyClassBindingValue: string | null = null;
 
-    @Component({
-      template: '<div class="static-val" [class]="c" [my-class-dir]="x"></div>',
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
-    })
-    class Cmp {
-      c: any = null;
-      x: any = 'foo';
-    }
-
     @Directive({
       selector: '[my-class-dir]',
-      standalone: false,
     })
     class MyClassDir {
       @Input('class')
@@ -1819,7 +1636,16 @@ describe('styling', () => {
       }
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp, MyClassDir]});
+    @Component({
+      template: '<div class="static-val" [class]="c" [my-class-dir]="x"></div>',
+      imports: [MyClassDir],
+      changeDetection: ChangeDetectionStrategy.Eager,
+    })
+    class Cmp {
+      c: any = null;
+      x: any = 'foo';
+    }
+
     const fixture = TestBed.createComponent(Cmp);
     fixture.detectChanges();
 
@@ -1850,18 +1676,9 @@ describe('styling', () => {
   });
 
   it('should allow multiple directives to set dynamic and static classes independent of one another', () => {
-    @Component({
-      template: ` <div dir-one dir-two></div> `,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
-    })
-    class Cmp {}
-
     @Directive({
       selector: '[dir-one]',
       host: {'[class.dir-one]': 'dirOneExp'},
-      standalone: false,
     })
     class DirOne {
       dirOneExp = true;
@@ -1870,11 +1687,16 @@ describe('styling', () => {
     @Directive({
       selector: '[dir-two]',
       host: {'class': 'dir-two'},
-      standalone: false,
     })
     class DirTwo {}
 
-    TestBed.configureTestingModule({declarations: [Cmp, DirOne, DirTwo]});
+    @Component({
+      template: ` <div dir-one dir-two></div> `,
+
+      imports: [DirOne, DirTwo],
+    })
+    class Cmp {}
+
     const fixture = TestBed.createComponent(Cmp);
     fixture.detectChanges();
 
@@ -1893,13 +1715,9 @@ describe('styling', () => {
           [style.font-size]="'   '"
         ></div>
       `,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class Cmp {}
 
-    TestBed.configureTestingModule({declarations: [Cmp]});
     const fixture = TestBed.createComponent(Cmp);
     fixture.detectChanges();
 
@@ -1914,13 +1732,11 @@ describe('styling', () => {
     it('should not overwrite other directive info when using NgClass', () => {
       @Directive({
         selector: '[test-dir]',
-        standalone: false,
       })
       class TestDir {}
 
       @Directive({
         selector: '[child-dir]',
-        standalone: false,
       })
       class ChildDir {
         constructor(public parent: TestDir) {}
@@ -1928,12 +1744,12 @@ describe('styling', () => {
 
       @Component({
         selector: 'app',
+        imports: [NgClass, NgIf, ChildDir, TestDir],
         template: `
           <div class="my-class" [ngClass]="classMap" test-dir>
             <div *ngIf="showing" child-dir>Hello</div>
           </div>
         `,
-        standalone: false,
 
         changeDetection: ChangeDetectionStrategy.Eager,
       })
@@ -1942,7 +1758,6 @@ describe('styling', () => {
         showing = false;
       }
 
-      TestBed.configureTestingModule({declarations: [AppComponent, TestDir, ChildDir]});
       const fixture = TestBed.createComponent(AppComponent);
       fixture.detectChanges();
       const testDirDiv = fixture.debugElement.nativeElement.querySelector('div');
@@ -1963,7 +1778,6 @@ describe('styling', () => {
   it('should be able to name inputs starting with `class` or `style`', () => {
     @Directive({
       selector: '[dir]',
-      standalone: false,
     })
     class Dir {
       @Input('classesInSchool') classes = '';
@@ -1972,9 +1786,7 @@ describe('styling', () => {
 
     @Component({
       template: '<span dir [classesInSchool]="classes" [styleOfClothing]="style"></span>',
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
+      imports: [Dir],
     })
     class App {
       @ViewChild(Dir) dir!: Dir;
@@ -1983,7 +1795,6 @@ describe('styling', () => {
       style = '80s';
     }
 
-    TestBed.configureTestingModule({declarations: [App, Dir]});
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     const directive = fixture.componentInstance.dir;
@@ -1995,15 +1806,11 @@ describe('styling', () => {
   it('should be able to bind to `className`', () => {
     @Component({
       template: '',
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class App {
       @HostBinding('className') klass = 'one two';
     }
 
-    TestBed.configureTestingModule({declarations: [App]});
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     const classList = fixture.nativeElement.classList;
@@ -2024,7 +1831,6 @@ describe('styling', () => {
           [class.xyz]="xyz"
         ></div>
       `,
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
     })
@@ -2036,7 +1842,6 @@ describe('styling', () => {
       xyz = false;
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp]});
     const fixture = TestBed.createComponent(Cmp);
     fixture.detectChanges();
 
@@ -2072,7 +1877,6 @@ describe('styling', () => {
   it('should apply single style/class across the template and directive host bindings', () => {
     @Directive({
       selector: '[dir-that-sets-width]',
-      standalone: false,
     })
     class DirThatSetsWidthDirective {
       @Input('dir-that-sets-width') @HostBinding('style.width') public width: string = '';
@@ -2081,7 +1885,6 @@ describe('styling', () => {
     @Directive({
       selector: '[another-dir-that-sets-width]',
       host: {'[style.width]': 'width'},
-      standalone: false,
     })
     class AnotherDirThatSetsWidthDirective {
       @Input('another-dir-that-sets-width') public width: string = '';
@@ -2091,9 +1894,9 @@ describe('styling', () => {
       template: `
         <div [style.width]="w0" [dir-that-sets-width]="w1" [another-dir-that-sets-width]="w2"></div>
       `,
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
+      imports: [DirThatSetsWidthDirective, AnotherDirThatSetsWidthDirective],
     })
     class Cmp {
       w0: string | null | undefined = null;
@@ -2101,9 +1904,6 @@ describe('styling', () => {
       w2: string | null | undefined = null;
     }
 
-    TestBed.configureTestingModule({
-      declarations: [Cmp, DirThatSetsWidthDirective, AnotherDirThatSetsWidthDirective],
-    });
     const fixture = TestBed.createComponent(Cmp);
     fixture.componentInstance.w0 = '100px';
     fixture.componentInstance.w1 = '200px';
@@ -2143,7 +1943,6 @@ describe('styling', () => {
   it('should only run stylingFlush once when there are no collisions between styling properties', () => {
     @Directive({
       selector: '[dir-with-styling]',
-      standalone: false,
     })
     class DirWithStyling {
       @HostBinding('style.font-size') public fontSize = '100px';
@@ -2151,8 +1950,6 @@ describe('styling', () => {
 
     @Component({
       selector: 'comp-with-styling',
-      standalone: false,
-
       changeDetection: ChangeDetectionStrategy.Eager,
     })
     class CompWithStyling {
@@ -2165,8 +1962,7 @@ describe('styling', () => {
       template: `
         <comp-with-styling [style.opacity]="opacity" dir-with-styling>...</comp-with-styling>
       `,
-      standalone: false,
-
+      imports: [DirWithStyling, CompWithStyling],
       changeDetection: ChangeDetectionStrategy.Eager,
     })
     class Cmp {
@@ -2175,7 +1971,6 @@ describe('styling', () => {
       @ViewChild(DirWithStyling, {static: true}) dirWithStyling: DirWithStyling | null = null;
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp, DirWithStyling, CompWithStyling]});
     const fixture = TestBed.createComponent(Cmp);
     fixture.detectChanges();
 
@@ -2202,7 +1997,6 @@ describe('styling', () => {
   it('should combine all styling across the template, directive and component host bindings', () => {
     @Directive({
       selector: '[dir-with-styling]',
-      standalone: false,
     })
     class DirWithStyling {
       @HostBinding('style.color') public color = 'red';
@@ -2214,7 +2008,6 @@ describe('styling', () => {
 
     @Component({
       selector: 'comp-with-styling',
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
     })
@@ -2236,8 +2029,7 @@ describe('styling', () => {
           >...</comp-with-styling
         >
       `,
-      standalone: false,
-
+      imports: [DirWithStyling, CompWithStyling],
       changeDetection: ChangeDetectionStrategy.Eager,
     })
     class Cmp {
@@ -2246,7 +2038,6 @@ describe('styling', () => {
       tplClass = true;
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp, DirWithStyling, CompWithStyling]});
     const fixture = TestBed.createComponent(Cmp);
     fixture.detectChanges();
 
@@ -2291,7 +2082,6 @@ describe('styling', () => {
   it('should properly apply styling across sub and super class directive host bindings', () => {
     @Directive({
       selector: '[super-class-dir]',
-      standalone: false,
     })
     class SuperClassDirective {
       @HostBinding('style.width') public w1 = '100px';
@@ -2299,8 +2089,6 @@ describe('styling', () => {
 
     @Component({
       selector: '[sub-class-dir]',
-      standalone: false,
-
       changeDetection: ChangeDetectionStrategy.Eager,
     })
     class SubClassDirective extends SuperClassDirective {
@@ -2309,15 +2097,13 @@ describe('styling', () => {
 
     @Component({
       template: ` <div sub-class-dir [style.width]="w3"></div> `,
-      standalone: false,
-
+      imports: [SubClassDirective],
       changeDetection: ChangeDetectionStrategy.Eager,
     })
     class Cmp {
       w3: string | null | undefined = '300px';
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp, SuperClassDirective, SubClassDirective]});
     const fixture = TestBed.createComponent(Cmp);
     fixture.detectChanges();
 
@@ -2343,7 +2129,6 @@ describe('styling', () => {
   it('should apply map-based style and class entries', () => {
     @Component({
       template: '<div [style]="s" [class]="c"></div>',
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
     })
@@ -2371,7 +2156,6 @@ describe('styling', () => {
       }
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp]});
     const fixture = TestBed.createComponent(Cmp);
     const comp = fixture.componentInstance;
     comp.updateStyles('width', '100px');
@@ -2396,7 +2180,6 @@ describe('styling', () => {
   it('should resolve styling collisions across templates, directives and components for prop and map-based entries', () => {
     @Directive({
       selector: '[dir-that-sets-styling]',
-      standalone: false,
     })
     class DirThatSetsStyling {
       @HostBinding('style') public map: any = {color: 'red', width: '777px'};
@@ -2413,9 +2196,9 @@ describe('styling', () => {
           [class.xyz]="xyz"
         ></div>
       `,
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
+      imports: [DirThatSetsStyling],
     })
     class Cmp {
       map: any = {width: '111px', opacity: '0.5'};
@@ -2424,7 +2207,6 @@ describe('styling', () => {
       @ViewChild('dir', {read: DirThatSetsStyling, static: true}) dir!: DirThatSetsStyling;
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp, DirThatSetsStyling]});
     const fixture = TestBed.createComponent(Cmp);
     const comp = fixture.componentInstance;
     fixture.detectChanges();
@@ -2469,7 +2251,6 @@ describe('styling', () => {
     @Directive({
       selector: '[dir-that-sets-styling]',
       host: {'style': 'width:0px; height:0px'},
-      standalone: false,
     })
     class DirThatSetsStyling {
       @HostBinding('style') public map: any = {width: '999px', height: '999px'};
@@ -2485,9 +2266,9 @@ describe('styling', () => {
           dir-that-sets-styling
         ></div>
       `,
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
+      imports: [DirThatSetsStyling],
     })
     class Cmp {
       width: string | null | undefined = '111px';
@@ -2498,7 +2279,6 @@ describe('styling', () => {
       @ViewChild('dir', {read: DirThatSetsStyling, static: true}) dir!: DirThatSetsStyling;
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp, DirThatSetsStyling]});
     const fixture = TestBed.createComponent(Cmp);
     const comp = fixture.componentInstance;
 
@@ -2590,7 +2370,6 @@ describe('styling', () => {
   it('should not sanitize style values before writing them', () => {
     @Component({
       template: ` <div [style.width]="widthExp" [style.background-image]="bgImageExp"></div> `,
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
     })
@@ -2599,7 +2378,6 @@ describe('styling', () => {
       bgImageExp = '';
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp]});
     const fixture = TestBed.createComponent(Cmp);
     const comp = fixture.componentInstance;
     fixture.detectChanges();
@@ -2622,7 +2400,6 @@ describe('styling', () => {
   it('should not sanitize style values before writing them with styleMap', () => {
     @Component({
       template: ` <div [style.width]="widthExp" [style]="styleMapExp"></div> `,
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
     })
@@ -2631,7 +2408,6 @@ describe('styling', () => {
       styleMapExp: {[key: string]: any} = {};
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp]});
     const fixture = TestBed.createComponent(Cmp);
     const comp = fixture.componentInstance;
     fixture.detectChanges();
@@ -2656,7 +2432,6 @@ describe('styling', () => {
   it('should apply a unit to a style before writing it', () => {
     @Component({
       template: ` <div [style.width.px]="widthExp" [style.height.em]="heightExp"></div> `,
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
     })
@@ -2665,7 +2440,6 @@ describe('styling', () => {
       heightExp: string | number | null = '';
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp]});
     const fixture = TestBed.createComponent(Cmp);
     const comp = fixture.componentInstance;
     fixture.detectChanges();
@@ -2697,7 +2471,6 @@ describe('styling', () => {
         <!-- Verify regular style prop values not wrapped in SafeValue -->
         <span [style.color]="getColorUnsafe()"></span>
       `,
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
     })
@@ -2726,10 +2499,6 @@ describe('styling', () => {
       }
     }
 
-    TestBed.configureTestingModule({
-      imports: [CommonModule],
-      declarations: [MyComp],
-    });
     const fixture = TestBed.createComponent(MyComp);
     fixture.detectChanges();
 
@@ -2759,7 +2528,6 @@ describe('styling', () => {
   it('should evaluate follow-up [style] maps even if a former map is null', () => {
     @Directive({
       selector: '[dir-with-styling]',
-      standalone: false,
     })
     class DirWithStyleMap {
       @HostBinding('style') public styleMap: any = {color: 'red'};
@@ -2767,7 +2535,6 @@ describe('styling', () => {
 
     @Directive({
       selector: '[dir-with-styling-part2]',
-      standalone: false,
     })
     class DirWithStyleMapPart2 {
       @HostBinding('style') public styleMap: any = {width: '200px'};
@@ -2775,9 +2542,7 @@ describe('styling', () => {
 
     @Component({
       template: ` <div #div [style]="map" dir-with-styling dir-with-styling-part2></div> `,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
+      imports: [DirWithStyleMap, DirWithStyleMapPart2],
     })
     class Cmp {
       map: any = null;
@@ -2787,7 +2552,6 @@ describe('styling', () => {
       @ViewChild('div', {read: DirWithStyleMapPart2, static: true}) dir2!: DirWithStyleMapPart2;
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp, DirWithStyleMap, DirWithStyleMapPart2]});
     const fixture = TestBed.createComponent(Cmp);
     fixture.detectChanges();
 
@@ -2805,15 +2569,13 @@ describe('styling', () => {
           {{ item }}
         </div>
       `,
-      standalone: false,
-
+      imports: [NgFor],
       changeDetection: ChangeDetectionStrategy.Eager,
     })
     class Cmp {
       items = [1, 2, 3];
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp]});
     const fixture = TestBed.createComponent(Cmp);
     const comp = fixture.componentInstance;
     fixture.detectChanges();
@@ -2865,15 +2627,12 @@ describe('styling', () => {
         </div>
         <footer class="footer">footer</footer>
       `,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
+      imports: [NgFor],
     })
     class Cmp {
       items = [1, 2, 3];
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp]});
     const fixture = TestBed.createComponent(Cmp);
     const comp = fixture.componentInstance;
     fixture.detectChanges();
@@ -2903,7 +2662,6 @@ describe('styling', () => {
   it('should understand multiple directives which contain initial classes', () => {
     @Directive({
       selector: 'dir-one',
-      standalone: false,
     })
     class DirOne {
       @HostBinding('class') public className = 'dir-one';
@@ -2911,7 +2669,6 @@ describe('styling', () => {
 
     @Directive({
       selector: 'dir-two',
-      standalone: false,
     })
     class DirTwo {
       @HostBinding('class') public className = 'dir-two';
@@ -2923,13 +2680,11 @@ describe('styling', () => {
         <div class="initial"></div>
         <dir-two></dir-two>
       `,
-      standalone: false,
 
-      changeDetection: ChangeDetectionStrategy.Eager,
+      imports: [DirOne, DirTwo],
     })
     class Cmp {}
 
-    TestBed.configureTestingModule({declarations: [Cmp, DirOne, DirTwo]});
     const fixture = TestBed.createComponent(Cmp);
     fixture.detectChanges();
 
@@ -2945,7 +2700,6 @@ describe('styling', () => {
   it('should evaluate styling across the template directives when there are multiple elements/sources of styling', () => {
     @Directive({
       selector: '[one]',
-      standalone: false,
     })
     class DirOne {
       @HostBinding('class') public className = 'dir-one';
@@ -2953,7 +2707,6 @@ describe('styling', () => {
 
     @Directive({
       selector: '[two]',
-      standalone: false,
     })
     class DirTwo {
       @HostBinding('class') public className = 'dir-two';
@@ -2965,9 +2718,8 @@ describe('styling', () => {
         <div class="b" [style.height.px]="h" one two></div>
         <div class="c" [style.color]="c" two></div>
       `,
-      standalone: false,
 
-      changeDetection: ChangeDetectionStrategy.Eager,
+      imports: [DirOne, DirTwo],
     })
     class Cmp {
       w = 100;
@@ -2975,7 +2727,6 @@ describe('styling', () => {
       c = 'red';
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp, DirOne, DirTwo]});
     const fixture = TestBed.createComponent(Cmp);
     fixture.detectChanges();
 
@@ -2991,7 +2742,6 @@ describe('styling', () => {
   it('should evaluate styling across the template and directives within embedded views', () => {
     @Directive({
       selector: '[some-dir-with-styling]',
-      standalone: false,
     })
     class SomeDirWithStyling {
       @HostBinding('style')
@@ -3015,9 +2765,9 @@ describe('styling', () => {
         <section [style.width.px]="w"></section>
         <p [style.height.px]="h"></p>
       `,
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
+      imports: [NgFor, SomeDirWithStyling],
     })
     class Cmp {
       items: any[] = [];
@@ -3026,7 +2776,6 @@ describe('styling', () => {
       h = 100;
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp, SomeDirWithStyling]});
     const fixture = TestBed.createComponent(Cmp);
     const comp = fixture.componentInstance;
     comp.items = [1, 2, 3, 4];
@@ -3049,7 +2798,6 @@ describe('styling', () => {
   it("should flush bindings even if any styling hasn't changed in a previous directive", () => {
     @Directive({
       selector: '[one]',
-      standalone: false,
     })
     class DirOne {
       @HostBinding('style.width') w = '100px';
@@ -3058,7 +2806,6 @@ describe('styling', () => {
 
     @Directive({
       selector: '[two]',
-      standalone: false,
     })
     class DirTwo {
       @HostBinding('style.height') h = '200px';
@@ -3067,16 +2814,15 @@ describe('styling', () => {
 
     @Component({
       template: '<div #target one two></div>',
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
+      imports: [DirOne, DirTwo],
     })
     class Cmp {
       @ViewChild('target', {read: DirOne, static: true}) one!: DirOne;
       @ViewChild('target', {read: DirTwo, static: true}) two!: DirTwo;
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp, DirOne, DirTwo]});
     const fixture = TestBed.createComponent(Cmp);
     const comp = fixture.componentInstance;
     fixture.detectChanges();
@@ -3098,7 +2844,6 @@ describe('styling', () => {
   it('should work with NO_CHANGE values if they are applied to bindings ', () => {
     @Component({
       template: ` <div [style.width]="w" style.height="{{ h }}" [style.opacity]="o"></div> `,
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
     })
@@ -3108,7 +2853,6 @@ describe('styling', () => {
       o: any = null;
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp]});
     const fixture = TestBed.createComponent(Cmp);
     const comp = fixture.componentInstance;
 
@@ -3134,16 +2878,13 @@ describe('styling', () => {
   it('should allow [ngStyle] and [ngClass] to be used together', () => {
     @Component({
       template: ` <div [ngClass]="c" [ngStyle]="s"></div> `,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
+      imports: [NgClass, NgStyle],
     })
     class Cmp {
       c: any = 'foo bar';
       s: any = {width: '200px'};
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp]});
     const fixture = TestBed.createComponent(Cmp);
     fixture.detectChanges();
 
@@ -3156,8 +2897,7 @@ describe('styling', () => {
   it('should allow to reset style property value defined using ngStyle', () => {
     @Component({
       template: ` <div [ngStyle]="s"></div> `,
-      standalone: false,
-
+      imports: [NgStyle],
       changeDetection: ChangeDetectionStrategy.Eager,
     })
     class Cmp {
@@ -3168,7 +2908,6 @@ describe('styling', () => {
       }
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp]});
     const fixture = TestBed.createComponent(Cmp);
     const comp = fixture.componentInstance;
     fixture.detectChanges();
@@ -3186,7 +2925,6 @@ describe('styling', () => {
     @Component({
       selector: 'child',
       template: ` <div [class.ready-child]="readyTpl"></div> `,
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
     })
@@ -3207,7 +2945,6 @@ describe('styling', () => {
       host: {
         '[style.color]': 'color',
       },
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
     })
@@ -3239,15 +2976,13 @@ describe('styling', () => {
 
     @Component({
       template: `<parent [prop]="prop"></parent>`,
-      standalone: false,
-
+      imports: [ParentCmp],
       changeDetection: ChangeDetectionStrategy.Eager,
     })
     class App {
       prop = 'a';
     }
 
-    TestBed.configureTestingModule({declarations: [App, ParentCmp, ChildCmp]});
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges(false);
 
@@ -3270,8 +3005,6 @@ describe('styling', () => {
     @Component({
       selector: 'child',
       template: ` <div [class.ready-child]="readyTpl"></div> `,
-      standalone: false,
-
       changeDetection: ChangeDetectionStrategy.Eager,
     })
     class ChildCmp {
@@ -3288,8 +3021,6 @@ describe('styling', () => {
           <p>{{ prop }}</p>
         </div>
       `,
-      standalone: false,
-
       changeDetection: ChangeDetectionStrategy.Eager,
     })
     class ParentCmp {
@@ -3314,15 +3045,13 @@ describe('styling', () => {
 
     @Component({
       template: `<parent #parent></parent>`,
-      standalone: false,
-
+      imports: [ParentCmp],
       changeDetection: ChangeDetectionStrategy.Eager,
     })
     class App {
       @ViewChild('parent', {static: true}) public parent: ParentCmp | null = null;
     }
 
-    TestBed.configureTestingModule({declarations: [App, ParentCmp, ChildCmp]});
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges(false);
 
@@ -3342,12 +3071,18 @@ describe('styling', () => {
   });
 
   it('should allow various duplicate properties to be defined in various styling maps within the template and directive styling bindings', () => {
+    @Directive({
+      selector: '[dir-with-styling]',
+    })
+    class DirectiveExpectingStyling {
+      @Input('dir-with-styling') @HostBinding('style') public styles: any = null;
+    }
+
     @Component({
       template: `
         <div [style.width]="w" [style.height]="h" [style]="s1" [dir-with-styling]="s2"></div>
       `,
-      standalone: false,
-
+      imports: [DirectiveExpectingStyling],
       changeDetection: ChangeDetectionStrategy.Eager,
     })
     class Cmp {
@@ -3357,15 +3092,6 @@ describe('styling', () => {
       s2: any = {border: '10px solid red', width: '300px'};
     }
 
-    @Directive({
-      selector: '[dir-with-styling]',
-      standalone: false,
-    })
-    class DirectiveExpectingStyling {
-      @Input('dir-with-styling') @HostBinding('style') public styles: any = null;
-    }
-
-    TestBed.configureTestingModule({declarations: [Cmp, DirectiveExpectingStyling]});
     const fixture = TestBed.createComponent(Cmp);
     fixture.detectChanges();
 
@@ -3386,7 +3112,6 @@ describe('styling', () => {
     let dirInstance: any;
     @Directive({
       selector: '[dir]',
-      standalone: false,
     })
     class Dir {
       constructor(
@@ -3405,15 +3130,10 @@ describe('styling', () => {
 
     @Component({
       template: `<div dir></div>`,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
+      imports: [Dir],
     })
     class App {}
 
-    TestBed.configureTestingModule({
-      declarations: [App, Dir],
-    });
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     dirInstance.setStyles();
@@ -3427,7 +3147,6 @@ describe('styling', () => {
     let dirInstance: any;
     @Directive({
       selector: '[dir]',
-      standalone: false,
     })
     class Dir {
       constructor(
@@ -3440,15 +3159,11 @@ describe('styling', () => {
 
     @Component({
       template: `<div dir></div>`,
-      standalone: false,
 
-      changeDetection: ChangeDetectionStrategy.Eager,
+      imports: [Dir],
     })
     class App {}
 
-    TestBed.configureTestingModule({
-      declarations: [App, Dir],
-    });
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
 
@@ -3475,7 +3190,6 @@ describe('styling', () => {
         <span class="container" [ngClass]="{disabled: isDisabled}"></span>
         <div [style.background]="background"></div>
       `,
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
     })
@@ -3484,7 +3198,6 @@ describe('styling', () => {
       background = 'orange';
     }
 
-    TestBed.configureTestingModule({declarations: [AppComponent]});
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
 
@@ -3499,7 +3212,6 @@ describe('styling', () => {
   it('should not set classes when falsy value is passed while a sanitizer from host bindings is present', () => {
     @Directive({
       selector: '[blockStyles]',
-      standalone: false,
     })
     class StylesDirective {
       @HostBinding('style.border') border = '1px solid red';
@@ -3509,15 +3221,14 @@ describe('styling', () => {
 
     @Component({
       template: `<div class="container" [ngClass]="{disabled: isDisabled}" blockStyles></div>`,
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
+      imports: [StylesDirective],
     })
     class AppComponent {
       isDisabled = false;
     }
 
-    TestBed.configureTestingModule({declarations: [AppComponent, StylesDirective]});
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
 
@@ -3532,7 +3243,6 @@ describe('styling', () => {
   it('should throw an error if a prop-based style/class binding value is changed during checkNoChanges', () => {
     @Component({
       template: ` <div [style.color]="color" [class.foo]="fooClass"></div> `,
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
     })
@@ -3546,7 +3256,6 @@ describe('styling', () => {
       }
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp]});
     const fixture = TestBed.createComponent(Cmp);
 
     expect(() => {
@@ -3557,7 +3266,6 @@ describe('styling', () => {
   it('should throw an error if a map-based style/class binding value is changed during checkNoChanges', () => {
     @Component({
       template: ` <div [style]="style" [class]="klass"></div> `,
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
     })
@@ -3571,7 +3279,6 @@ describe('styling', () => {
       }
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp]});
     const fixture = TestBed.createComponent(Cmp);
 
     expect(() => {
@@ -3582,17 +3289,13 @@ describe('styling', () => {
   it('should properly merge class interpolation with class-based directives', () => {
     @Component({
       template: `<div class="zero {{ one }}" [class.two]="true" [ngClass]="'three'"></div>`,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
+      imports: [NgClass],
     })
     class MyComp {
       one = 'one';
     }
 
-    const fixture = TestBed.configureTestingModule({declarations: [MyComp]}).createComponent(
-      MyComp,
-    );
+    const fixture = TestBed.createComponent(MyComp);
     fixture.detectChanges();
 
     expect(fixture.debugElement.nativeElement.innerHTML).toContain('zero');
@@ -3607,15 +3310,11 @@ describe('styling', () => {
         <div id="first" class="zero {{ one }}" [class]="'two'"></div>
         <div id="second" [class]="'two'" class="zero {{ one }}"></div>
       `,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class MyComp {
       one = 'one';
     }
 
-    TestBed.configureTestingModule({declarations: [MyComp]});
     const fixture = TestBed.createComponent(MyComp);
     fixture.detectChanges();
 
@@ -3636,15 +3335,10 @@ describe('styling', () => {
         <div id="first" style="margin: {{ margin }}" [style]="'padding: 20px;'"></div>
         <div id="second" [style]="'padding: 20px;'" style="margin: {{ margin }}"></div>
       `,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class MyComp {
       margin = '10px';
     }
-
-    TestBed.configureTestingModule({declarations: [MyComp]});
     const fixture = TestBed.createComponent(MyComp);
     fixture.detectChanges();
 
@@ -3660,15 +3354,12 @@ describe('styling', () => {
   it('should allow to reset style property value defined using [style.prop.px] binding', () => {
     @Component({
       template: '<div [style.left.px]="left"></div>',
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
     })
     class MyComp {
       left = '';
     }
-
-    TestBed.configureTestingModule({declarations: [MyComp]});
     const fixture = TestBed.createComponent(MyComp);
     fixture.detectChanges();
 
@@ -3691,7 +3382,6 @@ describe('styling', () => {
   it('should retain classes added externally', () => {
     @Component({
       template: `<div [class]="exp"></div>`,
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
     })
@@ -3699,9 +3389,7 @@ describe('styling', () => {
       exp = '';
     }
 
-    const fixture = TestBed.configureTestingModule({declarations: [MyComp]}).createComponent(
-      MyComp,
-    );
+    const fixture = TestBed.createComponent(MyComp);
     fixture.detectChanges();
 
     const div = fixture.nativeElement.querySelector('div')!;
@@ -3727,9 +3415,6 @@ describe('styling', () => {
     it('should not throw when bound to SafeValue', () => {
       @Component({
         template: `<div [style.background-image]="iconSafe"></div>`,
-        standalone: false,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {
         icon = 'https://i.imgur.com/4AiXzf8.jpg';
@@ -3740,9 +3425,7 @@ describe('styling', () => {
         constructor(private sanitizer: DomSanitizer) {}
       }
 
-      const fixture = TestBed.configureTestingModule({declarations: [MyComp]}).createComponent(
-        MyComp,
-      );
+      const fixture = TestBed.createComponent(MyComp);
       fixture.detectChanges(true /* Verify that check no changes does not cause an exception */);
       const div: HTMLElement = fixture.nativeElement.querySelector('div');
       expect(div.style.getPropertyValue('background-image')).toEqual(
@@ -3763,15 +3446,8 @@ describe('styling', () => {
           <div></div>
         `,
         styles: ['div { width: 100px; }'],
-        standalone: false,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyComp {}
-
-      TestBed.configureTestingModule({
-        declarations: [MyComp],
-      });
 
       const fixture = TestBed.createComponent(MyComp);
       fixture.detectChanges();
@@ -3782,6 +3458,14 @@ describe('styling', () => {
     });
 
   it('should allow multiple styling bindings to work alongside property/attribute bindings', () => {
+    @Directive({
+      selector: '[dir-that-sets-styles]',
+    })
+    class DirThatSetsStyling {
+      @HostBinding('style.width') public w = '100px';
+      @HostBinding('style.height') public h = '200px';
+    }
+
     @Component({
       template: ` <div
         dir-that-sets-styles
@@ -3789,24 +3473,12 @@ describe('styling', () => {
         [attr.title]="'my-title'"
         [attr.data-foo]="'my-foo'"
       ></div>`,
-      standalone: false,
 
-      changeDetection: ChangeDetectionStrategy.Eager,
+      imports: [DirThatSetsStyling],
     })
     class MyComp {}
 
-    @Directive({
-      selector: '[dir-that-sets-styles]',
-      standalone: false,
-    })
-    class DirThatSetsStyling {
-      @HostBinding('style.width') public w = '100px';
-      @HostBinding('style.height') public h = '200px';
-    }
-
-    const fixture = TestBed.configureTestingModule({
-      declarations: [MyComp, DirThatSetsStyling],
-    }).createComponent(MyComp);
+    const fixture = TestBed.createComponent(MyComp);
     fixture.detectChanges();
     const div = fixture.nativeElement.querySelector('div')!;
     expect(div.style.getPropertyValue('width')).toEqual('100px');
@@ -3819,17 +3491,13 @@ describe('styling', () => {
   it('should allow host styling on the root element with external styling', () => {
     @Component({
       template: '...',
-      standalone: false,
-
       changeDetection: ChangeDetectionStrategy.Eager,
     })
     class MyComp {
       @HostBinding('class') public classes = '';
     }
 
-    const fixture = TestBed.configureTestingModule({declarations: [MyComp]}).createComponent(
-      MyComp,
-    );
+    const fixture = TestBed.createComponent(MyComp);
     fixture.detectChanges();
     const root = fixture.nativeElement as HTMLElement;
     expect(root.className).toEqual('');
@@ -3849,15 +3517,9 @@ describe('styling', () => {
   it('should apply camelCased class names', () => {
     @Component({
       template: `<div [class]="'fooBar'" [class.barFoo]="true"></div>`,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class MyComp {}
 
-    TestBed.configureTestingModule({
-      declarations: [MyComp],
-    });
     const fixture = TestBed.createComponent(MyComp);
     fixture.detectChanges();
 
@@ -3869,7 +3531,6 @@ describe('styling', () => {
   it('should convert camelCased style property names to snake-case', () => {
     @Component({
       template: `<div [style]="myStyles"></div>`,
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
     })
@@ -3877,9 +3538,6 @@ describe('styling', () => {
       myStyles = {};
     }
 
-    TestBed.configureTestingModule({
-      declarations: [MyComp],
-    });
     const fixture = TestBed.createComponent(MyComp);
     fixture.detectChanges();
 
@@ -3895,7 +3553,6 @@ describe('styling', () => {
 
     @Component({
       template: `<div [style.width]="myWidth" [style.height]="'200px'"></div>`,
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
     })
@@ -3908,7 +3565,6 @@ describe('styling', () => {
       }
     }
 
-    TestBed.configureTestingModule({declarations: [MyComp]});
     const fixture = TestBed.createComponent(MyComp);
 
     raiseWidthError = true;
@@ -3925,8 +3581,6 @@ describe('styling', () => {
     @Component({
       selector: 'my-comp-with-styling',
       template: '',
-      standalone: false,
-
       changeDetection: ChangeDetectionStrategy.Eager,
     })
     class MyCompWithStyling {
@@ -3937,7 +3591,6 @@ describe('styling', () => {
 
     @Directive({
       selector: '[my-dir-with-styling]',
-      standalone: false,
     })
     class MyDirWithStyling {
       @HostBinding('style') myStyles: any = {width: '200px'};
@@ -3955,8 +3608,7 @@ describe('styling', () => {
         >
         </my-comp-with-styling>
       `,
-      standalone: false,
-
+      imports: [MyCompWithStyling, MyDirWithStyling],
       changeDetection: ChangeDetectionStrategy.Eager,
     })
     class MyComp {
@@ -3967,7 +3619,6 @@ describe('styling', () => {
       @ViewChild(MyCompWithStyling) comp!: MyCompWithStyling;
     }
 
-    TestBed.configureTestingModule({declarations: [MyComp, MyCompWithStyling, MyDirWithStyling]});
     const fixture = TestBed.createComponent(MyComp);
     const comp = fixture.componentInstance;
     const elm = fixture.nativeElement.querySelector('my-comp-with-styling')!;
@@ -4000,28 +3651,21 @@ describe('styling', () => {
       selector: 'my-comp-with-styling',
       host: {style: 'color: blue'},
       template: '',
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class MyCompWithStyling {}
 
     @Directive({
       selector: '[my-dir-with-styling]',
       host: {style: 'color: red'},
-      standalone: false,
     })
     class MyDirWithStyling {}
 
     @Component({
       template: `<my-comp-with-styling my-dir-with-styling></my-comp-with-styling>`,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
+      imports: [MyCompWithStyling, MyDirWithStyling],
     })
     class MyComp {}
 
-    TestBed.configureTestingModule({declarations: [MyComp, MyCompWithStyling, MyDirWithStyling]});
     const fixture = TestBed.createComponent(MyComp);
     const elm = fixture.nativeElement.querySelector('my-comp-with-styling')!;
 
@@ -4033,7 +3677,6 @@ describe('styling', () => {
     @Directive({
       selector: '[dir-that-sets-one-two]',
       exportAs: 'one',
-      standalone: false,
     })
     class DirThatSetsOneTwo {
       @HostBinding('class.one') one = false;
@@ -4043,7 +3686,6 @@ describe('styling', () => {
     @Directive({
       selector: '[dir-that-sets-three-four]',
       exportAs: 'two',
-      standalone: false,
     })
     class DirThatSetsThreeFour {
       @HostBinding('class.three') three = false;
@@ -4055,9 +3697,9 @@ describe('styling', () => {
         <div #div1 dir-that-sets-one-two dir-that-sets-three-four></div>
         <div #div2 [class.zero]="zero" dir-that-sets-one-two dir-that-sets-three-four></div>
       `,
-      standalone: false,
 
       changeDetection: ChangeDetectionStrategy.Eager,
+      imports: [DirThatSetsThreeFour, DirThatSetsOneTwo],
     })
     class MyComp {
       @ViewChild('div1', {static: true, read: DirThatSetsOneTwo})
@@ -4074,10 +3716,6 @@ describe('styling', () => {
 
       zero = false;
     }
-
-    TestBed.configureTestingModule({
-      declarations: [MyComp, DirThatSetsThreeFour, DirThatSetsOneTwo],
-    });
 
     const fixture = TestBed.createComponent(MyComp);
     fixture.detectChanges();
@@ -4139,9 +3777,6 @@ describe('styling', () => {
       selector: 'comp-with-classes',
       template: '',
       host: {'class': 'host'},
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class CompWithClasses {
       constructor(ref: ElementRef) {
@@ -4151,17 +3786,13 @@ describe('styling', () => {
 
     @Component({
       template: `<comp-with-classes class="inline" *ngFor="let item of items"></comp-with-classes>`,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
+      imports: [CompWithClasses, NgFor],
     })
     class MyComp {
       items = [1, 2, 3];
     }
 
-    const fixture = TestBed.configureTestingModule({
-      declarations: [MyComp, CompWithClasses],
-    }).createComponent(MyComp);
+    const fixture = TestBed.createComponent(MyComp);
     fixture.detectChanges();
 
     const [one, two, three] = fixture.nativeElement.querySelectorAll(
@@ -4182,23 +3813,19 @@ describe('styling', () => {
   });
 
   it('should allow a single style host binding on an element', () => {
-    @Component({
-      template: `<div single-host-style-dir></div>`,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
-    })
-    class Cmp {}
-
     @Directive({
       selector: '[single-host-style-dir]',
-      standalone: false,
     })
     class SingleHostStyleDir {
       @HostBinding('style.width') width = '100px';
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp, SingleHostStyleDir]});
+    @Component({
+      template: `<div single-host-style-dir></div>`,
+      imports: [SingleHostStyleDir],
+    })
+    class Cmp {}
+
     const fixture = TestBed.createComponent(Cmp);
     fixture.detectChanges();
 
@@ -4208,20 +3835,9 @@ describe('styling', () => {
 
   it('should override class bindings when a directive extends another directive', () => {
     @Component({
-      template: `<child-comp class="template"></child-comp>`,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
-    })
-    class Cmp {}
-
-    @Component({
       selector: 'parent-comp',
       host: {'class': 'parent-comp', '[class.parent-comp-active]': 'true'},
       template: '...',
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class ParentComp {}
 
@@ -4234,13 +3850,15 @@ describe('styling', () => {
         '[class.parent-comp-active]': 'false',
       },
       template: '...',
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class ChildComp extends ParentComp {}
 
-    TestBed.configureTestingModule({declarations: [Cmp, ChildComp, ParentComp]});
+    @Component({
+      template: `<child-comp class="template"></child-comp>`,
+      imports: [ChildComp],
+    })
+    class Cmp {}
+
     const fixture = TestBed.createComponent(Cmp);
     fixture.detectChanges();
 
@@ -4259,7 +3877,6 @@ describe('styling', () => {
 
     @Directive({
       selector: '[test]',
-      standalone: false,
     })
     class MyDir {
       @Input('class')
@@ -4271,13 +3888,9 @@ describe('styling', () => {
     @Component({
       // Note that we shouldn't have a `class` attribute here.
       template: `<div test></div>`,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class MyComp {}
 
-    TestBed.configureTestingModule({declarations: [MyComp, MyDir]});
     const fixture = TestBed.createComponent(MyComp);
     fixture.detectChanges();
 
@@ -4296,12 +3909,8 @@ describe('styling', () => {
           font-size: 10px;
         }
       `,
-      standalone: false,
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class Cmp {}
-    TestBed.configureTestingModule({declarations: [Cmp]});
     const fixture = TestBed.createComponent(Cmp);
     fixture.detectChanges();
 
@@ -4367,8 +3976,6 @@ describe('styling', () => {
   it('should support Set in a class binding', () => {
     @Component({
       template: '<div [class]="classes" [class.extra]="true"></div>',
-
-      changeDetection: ChangeDetectionStrategy.Eager,
     })
     class Cmp {
       classes = new Set(['a', 'b', 'c']);
@@ -4384,9 +3991,6 @@ describe('styling', () => {
     it('should support sanitizer value in the [style] bindings', () => {
       @Component({
         template: `<div [style]="style"></div>`,
-        standalone: false,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class HostBindingTestComponent {
         style: SafeStyle;
@@ -4394,7 +3998,6 @@ describe('styling', () => {
           this.style = this.sanitizer.bypassSecurityTrustStyle('color: white; display: block;');
         }
       }
-      TestBed.configureTestingModule({declarations: [HostBindingTestComponent]});
       const fixture = TestBed.createComponent(HostBindingTestComponent);
       fixture.detectChanges();
       const div: HTMLElement = fixture.nativeElement.querySelector('div');
@@ -4408,9 +4011,6 @@ describe('styling', () => {
         host: {
           '[class.foo]': 'hostClass',
         },
-        standalone: false,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyCmp {
         hostClass = true;
@@ -4421,7 +4021,6 @@ describe('styling', () => {
         host: {
           '[class]': 'hostClass',
         },
-        standalone: false,
       })
       class HostStylingsDir {
         hostClass = {'bar': true};
@@ -4429,9 +4028,7 @@ describe('styling', () => {
 
       @Component({
         template: `<my-cmp *ngFor="let i of [1, 2]" host-styling></my-cmp>`,
-        standalone: false,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
+        imports: [MyCmp, HostStylingsDir, NgFor],
       })
       class MyApp {
         // When the first view in the list gets CD-ed, everything works.
@@ -4444,7 +4041,6 @@ describe('styling', () => {
         // assertions fails as it expects an `KeyValueArray`.
       }
 
-      TestBed.configureTestingModule({declarations: [MyApp, MyCmp, HostStylingsDir]});
       const fixture = TestBed.createComponent(MyApp);
       expect(() => fixture.detectChanges()).not.toThrow();
       const [cmp1, cmp2] = fixture.nativeElement.querySelectorAll('my-cmp');
@@ -4456,22 +4052,16 @@ describe('styling', () => {
       @Component({
         selector: 'my-cmp',
         template: `className = {{ className }}`,
-        standalone: false,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyCmp {
         @Input() className: string = 'unbound';
       }
+
       @Component({
         template: `<my-cmp [class]="'bound'"></my-cmp>`,
-        standalone: false,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
+        imports: [MyCmp],
       })
       class MyApp {}
-
-      TestBed.configureTestingModule({declarations: [MyApp, MyCmp]});
       const fixture = TestBed.createComponent(MyApp);
       fixture.detectChanges();
       expect(fixture.nativeElement.textContent).toEqual('className = unbound');
@@ -4481,22 +4071,16 @@ describe('styling', () => {
       @Component({
         selector: 'my-cmp',
         template: `className = {{ className }}`,
-        standalone: false,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
       })
       class MyCmp {
         @Input() className: string = 'unbound';
       }
+
       @Component({
         template: `<my-cmp class="bound"></my-cmp>`,
-        standalone: false,
-
-        changeDetection: ChangeDetectionStrategy.Eager,
+        imports: [MyCmp],
       })
       class MyApp {}
-
-      TestBed.configureTestingModule({declarations: [MyApp, MyCmp]});
       const fixture = TestBed.createComponent(MyApp);
       fixture.detectChanges();
       expect(fixture.nativeElement.textContent).toEqual('className = unbound');

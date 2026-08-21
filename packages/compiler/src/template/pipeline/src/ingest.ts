@@ -21,7 +21,7 @@ import {
 } from '../../../render3/view/api';
 import {icuFromI18nMessage} from '../../../render3/view/i18n/util';
 import {DomElementSchemaRegistry} from '../../../schema/dom_element_schema_registry';
-import {BindingParser} from '../../../template_parser/binding_parser';
+import {BindingParser, calcPossibleSecurityContexts} from '../../../template_parser/binding_parser';
 import * as ir from '../ir';
 
 import {
@@ -48,7 +48,7 @@ export function isI18nRootNode(meta?: i18n.I18nMeta): meta is i18n.Message {
   return meta instanceof i18n.Message;
 }
 
-export function isSingleI18nIcu(meta?: i18n.I18nMeta): meta is i18n.I18nMeta & {nodes: [i18n.Icu]} {
+function isSingleI18nIcu(meta?: i18n.I18nMeta): meta is i18n.I18nMeta & {nodes: [i18n.Icu]} {
   return isI18nRootNode(meta) && meta.nodes.length === 1 && meta.nodes[0] instanceof i18n.Icu;
 }
 
@@ -125,19 +125,21 @@ export function ingestHostBinding(
     if (property.isAnimation) {
       bindingKind = ir.BindingKind.Animation;
     }
-    const securityContexts = bindingParser
-      .calcPossibleSecurityContexts(
-        input.componentSelector,
-        property.name,
-        bindingKind === ir.BindingKind.Attribute,
-      )
-      .filter((context) => context !== SecurityContext.NONE);
+    const securityContexts = calcHostBindingSecurityContexts(
+      bindingParser,
+      input.componentSelector,
+      property.name,
+      bindingKind === ir.BindingKind.Attribute,
+    );
     ingestDomProperty(job, property, bindingKind, securityContexts);
   }
   for (const [name, expr] of Object.entries(input.attributes) ?? []) {
-    const securityContexts = bindingParser
-      .calcPossibleSecurityContexts(input.componentSelector, name, true)
-      .filter((context) => context !== SecurityContext.NONE);
+    const securityContexts = calcHostBindingSecurityContexts(
+      bindingParser,
+      input.componentSelector,
+      name,
+      true,
+    );
     ingestHostAttribute(job, name, expr, securityContexts);
   }
   for (const event of input.events ?? []) {
@@ -146,9 +148,45 @@ export function ingestHostBinding(
   return job;
 }
 
+function calcHostBindingSecurityContexts(
+  bindingParser: BindingParser,
+  selector: string,
+  name: string,
+  isAttribute: boolean,
+): SecurityContext[] {
+  const declaringSelectorContexts = bindingParser.calcPossibleSecurityContexts(
+    selector,
+    name,
+    isAttribute,
+  );
+  const concreteHostContexts = calcPossibleSecurityContexts(
+    domSchema,
+    null,
+    domSchema.getMappedPropName(name),
+    isAttribute,
+  );
+  const concreteHostNonNoneContexts = concreteHostContexts.filter(
+    (context) => context !== SecurityContext.NONE,
+  );
+  const concreteHostNonNoneCount = concreteHostNonNoneContexts.length;
+  const hasConcreteHostNoneContext = concreteHostNonNoneCount !== concreteHostContexts.length;
+
+  // Host bindings can run against a concrete host whose element name differs from the declaring
+  // selector, including dynamic root components whose TNode name is `#host`.
+  if (hasConcreteHostNoneContext && concreteHostNonNoneCount > 0) {
+    return concreteHostContexts;
+  }
+
+  if (concreteHostNonNoneContexts.some((context) => !declaringSelectorContexts.includes(context))) {
+    return concreteHostContexts;
+  }
+
+  return declaringSelectorContexts.filter((context) => context !== SecurityContext.NONE);
+}
+
 // TODO: We should refactor the parser to use the same types and structures for host bindings as
 // with ordinary components. This would allow us to share a lot more ingestion code.
-export function ingestDomProperty(
+function ingestDomProperty(
   job: HostBindingCompilationJob,
   property: e.ParsedProperty,
   bindingKind: ir.BindingKind,
@@ -182,7 +220,7 @@ export function ingestDomProperty(
   );
 }
 
-export function ingestHostAttribute(
+function ingestHostAttribute(
   job: HostBindingCompilationJob,
   name: string,
   value: o.Expression,
@@ -206,7 +244,7 @@ export function ingestHostAttribute(
   job.root.update.push(attrBinding);
 }
 
-export function ingestHostEvent(job: HostBindingCompilationJob, event: e.ParsedEvent) {
+function ingestHostEvent(job: HostBindingCompilationJob, event: e.ParsedEvent) {
   let eventBinding: ir.CreateOp;
   if (event.type === e.ParsedEventType.Animation) {
     eventBinding = ir.createAnimationListenerOp(

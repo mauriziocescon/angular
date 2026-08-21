@@ -21,6 +21,7 @@ import {MatIconRegistry} from '@angular/material/icon';
 import {SUPPORTED_APIS} from './application-providers/supported_apis';
 import {APP_DATA} from './application-providers/app_data';
 import {Settings} from './application-services/settings';
+import {AngieComponent} from './shared/angie/angie.component';
 
 const DETECT_ANGULAR_ATTEMPTS = 20;
 
@@ -48,7 +49,13 @@ export const LAST_SUPPORTED_VERSION = 12;
   selector: 'ng-devtools',
   templateUrl: './devtools.component.html',
   styleUrls: ['./devtools.component.scss'],
-  imports: [DevToolsTabsComponent, MatTooltip, MatProgressSpinnerModule, MatTooltipModule],
+  imports: [
+    DevToolsTabsComponent,
+    MatTooltip,
+    MatProgressSpinnerModule,
+    MatTooltipModule,
+    AngieComponent,
+  ],
 })
 export class DevToolsComponent implements OnDestroy {
   protected readonly supportedApis = inject(SUPPORTED_APIS);
@@ -108,12 +115,12 @@ export class DevToolsComponent implements OnDestroy {
   }
 
   private syncBackendWithSettings() {
-    // Keep BE in sync with timing API.
+    // Keep BE in sync with the performance track setting.
     effect(() => {
-      if (this.settings.timingAPIEnabled()) {
-        this.messageBus.emit('enableTimingAPI');
+      if (this.settings.performanceTrack()) {
+        this.messageBus.emit('enablePerformanceTrack');
       } else {
-        this.messageBus.emit('disableTimingAPI');
+        this.messageBus.emit('disablePerformanceTrack');
       }
     });
 

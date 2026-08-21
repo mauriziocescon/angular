@@ -206,6 +206,9 @@ export interface ComponentInputBindingOptions {
 }
 
 // @public
+export function containsTree(container: UrlTree, containee: UrlTree, options?: Partial<IsActiveMatchOptions>): boolean;
+
+// @public
 export function convertToParamMap(params: Params): ParamMap;
 
 // @public
@@ -597,7 +600,7 @@ export function provideRouter(routes: Routes, ...features: RouterFeatures[]): En
 export type QueryParamsHandling = 'merge' | 'preserve' | 'replace' | '';
 
 // @public
-export class RedirectCommand {
+export class RedirectCommand extends Error {
     constructor(redirectTo: UrlTree, navigationBehaviorOptions?: NavigationBehaviorOptions | undefined);
     // (undocumented)
     readonly navigationBehaviorOptions?: NavigationBehaviorOptions | undefined;
